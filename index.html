@@ -12,152 +12,22 @@
       margin: 0;
       overflow: hidden;
       background: #ffffff;
-      font-family: Arial, sans-serif;
-    }
-
-    #voicePermissionBar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 48px;
-      padding: 6px 10px;
-      box-sizing: border-box;
-      background: #fff3cd;
-      border-bottom: 1px solid #ffa500;
-      font-size: 14px;
-    }
-
-    #enableVoiceBtn {
-      border: 0;
-      border-radius: 6px;
-      padding: 9px 14px;
-      color: #ffffff;
-      background: #d32f2f;
-      font-size: 15px;
-      font-weight: 700;
     }
 
     #laundryBazaarApp {
       display: block;
       width: 100%;
-      height: calc(100% - 61px);
+      height: 100%;
       border: 0;
     }
   </style>
 </head>
 <body>
-  <div id="voicePermissionBar">
-    <span id="voicePermissionStatus">Enable microphone once to use Voice Token.</span>
-    <button id="enableVoiceBtn" type="button">Enable Voice</button>
-  </div>
   <iframe
     id="laundryBazaarApp"
     title="Laundry Bazaar"
-    src="https://script.google.com/macros/s/AKfycbzYgC-en_nUGAv8m11xa8K08RyIByB8Bhv3UGFZXqURj_bU9FDWyiAHnMXEUARkWuSc/exec"
-    allow="microphone *; autoplay *"
+    src="https://script.google.com/macros/s/AKfycbzYgC-en_nUGAv8m11xa8K08RyIByB8Bhv3UGFZXqURj_bU9FDWyiAHnMXEUARkWuSc/exec/exec"
     referrerpolicy="strict-origin-when-cross-origin">
   </iframe>
-  <script>
-    (function(){
-      var permissionBar = document.getElementById('voicePermissionBar');
-      var permissionStatus = document.getElementById('voicePermissionStatus');
-      var enableButton = document.getElementById('enableVoiceBtn');
-      var appFrame = document.getElementById('laundryBazaarApp');
-      var microphoneReady = false;
-      var activeRecognition = null;
-
-      function recognitionClass_(){
-        return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-      }
-
-      function setMicrophoneReady_(){
-        microphoneReady = true;
-        permissionStatus.textContent = 'Voice enabled';
-        enableButton.style.display = 'none';
-        permissionBar.style.minHeight = '32px';
-        permissionBar.style.padding = '3px 8px';
-        appFrame.style.height = 'calc(100% - 39px)';
-      }
-
-      enableButton.addEventListener('click', function(){
-        if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-          permissionStatus.textContent = 'Microphone is not supported in this browser.';
-          return;
-        }
-        enableButton.disabled = true;
-        permissionStatus.textContent = 'Requesting microphone permission...';
-        navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-          stream.getTracks().forEach(function(track){ track.stop(); });
-          setMicrophoneReady_();
-        }).catch(function(error){
-          enableButton.disabled = false;
-          permissionStatus.textContent = 'Microphone blocked. Allow it in Chrome site settings and retry.';
-        });
-      });
-
-      window.addEventListener('message', function(event){
-        var data = event.data || {};
-        if(data.type !== 'LB_WEB_VOICE_REQUEST') return;
-        if(event.source !== appFrame.contentWindow) return;
-
-        var mode = data.mode === 'confirmation' ? 'confirmation' : 'token';
-        var target = event.source;
-        var targetOrigin = event.origin || '*';
-        var Recognition = recognitionClass_();
-
-        if(!microphoneReady){
-          target.postMessage({
-            type:'LB_WEB_VOICE_ERROR',
-            mode:mode,
-            message:'Tap Enable Voice above the app, allow microphone access, then retry.'
-          }, targetOrigin);
-          return;
-        }
-        if(!Recognition){
-          target.postMessage({
-            type:'LB_WEB_VOICE_ERROR',
-            mode:mode,
-            message:'Speech recognition is not supported. Open this page in Google Chrome.'
-          }, targetOrigin);
-          return;
-        }
-
-        if(activeRecognition) try { activeRecognition.abort(); } catch(ignore) {}
-        var recognition = new Recognition();
-        activeRecognition = recognition;
-        recognition.lang = 'hi-IN';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 3;
-
-        recognition.onresult = function(resultEvent){
-          var results = resultEvent.results[resultEvent.results.length - 1];
-          var text = results && results[0] ? results[0].transcript : '';
-          target.postMessage({type:'LB_WEB_VOICE_RESULT', mode:mode, text:text}, targetOrigin);
-        };
-        recognition.onerror = function(errorEvent){
-          var message = errorEvent.error === 'no-speech'
-            ? 'No speech detected. Tap Start Voice Token and try again.'
-            : 'Voice error: ' + (errorEvent.error || 'recognition failed');
-          target.postMessage({type:'LB_WEB_VOICE_ERROR', mode:mode, message:message}, targetOrigin);
-        };
-        recognition.onend = function(){ activeRecognition = null; };
-
-        try {
-          recognition.start();
-          permissionStatus.textContent = mode === 'confirmation'
-            ? 'Listening for confirmation...'
-            : 'Listening... Speak Hindi, English or Hinglish.';
-        } catch(error) {
-          activeRecognition = null;
-          target.postMessage({
-            type:'LB_WEB_VOICE_ERROR',
-            mode:mode,
-            message:'Unable to start voice recognition: ' + error.message
-          }, targetOrigin);
-        }
-      });
-    })();
-  </script>
 </body>
 </html>
