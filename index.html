@@ -2,19 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  >
+
   <title>Laundry Bazaar</title>
+
   <style>
-    html, body {
+    html,
+    body {
       width: 100%;
       height: 100%;
       margin: 0;
+      padding: 0;
       overflow: hidden;
       background: #ffffff;
     }
 
-    #laundryBazaarApp {
+    iframe {
       display: block;
       width: 100%;
       height: 100%;
@@ -22,12 +28,12 @@
     }
   </style>
 </head>
+
 <body>
   <iframe
-    id="laundryBazaarApp"
-    title="Laundry Bazaar"
     src="https://script.google.com/macros/s/AKfycbyV0ww9rqQzngeGPEyWf3wFd1vQba35Xheio1gz__e-0tRFv3gilnoO_cds9Ij2O1jP/exec"
-    referrerpolicy="strict-origin-when-cross-origin">
-  </iframe>
+    title="Laundry Bazaar"
+    allow="microphone; camera; clipboard-read; clipboard-write"
+  ></iframe>
 </body>
 </html>
