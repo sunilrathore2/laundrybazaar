@@ -2,38 +2,106 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffa500">
   <title>Laundry Bazaar</title>
-
   <style>
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #ffffff;
-    }
-
-    iframe {
-      display: block;
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
+    * { box-sizing: border-box; }
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#f4f6fa; font-family:Arial,sans-serif; }
+    #portal { display:block; width:100%; height:100%; height:100dvh; border:0; background:#fff; }
+    #loading { position:fixed; inset:0; display:grid; place-content:center; gap:16px; text-align:center; padding:24px; background:#fff8e8; color:#333; }
+    #loading[hidden] { display:none; }
+    a { color:#1759a5; }
   </style>
 </head>
-
 <body>
-  <iframe
-    src="https://script.google.com/macros/s/AKfycbyV0ww9rqQzngeGPEyWf3wFd1vQba35Xheio1gz__e-0tRFv3gilnoO_cds9Ij2O1jP/exec"
-    title="Laundry Bazaar"
-    allow="microphone; camera; clipboard-read; clipboard-write"
-  ></iframe>
+  <div id="loading" role="status">
+    <strong>Loading Laundry Bazaar…</strong>
+    <a href="https://script.google.com/macros/s/AKfycbyYyI3gcFLFuUZnqtdCq7hBfNen287bbJzXnAvkim9xXFU1gg8J4hHhwEHx6ikuqU65/exec" target="_blank" rel="noopener noreferrer">Open portal directly</a>
+  </div>
+  <iframe id="portal" title="Laundry Bazaar Management Portal"
+    allow="microphone *; clipboard-read *; clipboard-write *; fullscreen *"
+    referrerpolicy="strict-origin-when-cross-origin"
+    src="https://script.google.com/macros/s/AKfycbyYyI3gcFLFuUZnqtdCq7hBfNen287bbJzXnAvkim9xXFU1gg8J4hHhwEHx6ikuqU65/exec"></iframe>
+  <noscript>Enable JavaScript to use Laundry Bazaar.</noscript>
+  <script>
+    'use strict';
+    const portal = document.getElementById('portal');
+    portal.addEventListener('load', () => {
+      document.getElementById('loading').hidden = true;
+    });
+
+    // The Apps Script page sends LB_NATIVE_VOICE_REQUEST to window.top.
+    // Reply to that exact sender: Apps Script may have multiple nested frames.
+    // Required Android interface: AndroidVoice.startRecognition(mode),
+    // AndroidVoice.stopRecognition(), and the callbacks defined below.
+    let voiceClient = null;
+    let activeMode = 'token';
+    let voicePending = false;
+    let responseTimer = null;
+    function trustedPortalOrigin(origin) {
+      try {
+        const url = new URL(origin);
+        return url.protocol === 'https:' &&
+          (url.hostname === 'script.google.com' ||
+           url.hostname === 'script.googleusercontent.com' ||
+           url.hostname.endsWith('.googleusercontent.com'));
+      } catch (_) { return false; }
+    }
+    function reply(type, fields) {
+      if (voiceClient) voiceClient.source.postMessage(Object.assign({type}, fields), voiceClient.origin);
+    }
+    function endPending() {
+      voicePending = false;
+      clearTimeout(responseTimer);
+      responseTimer = null;
+    }
+    window.onAndroidVoiceResult = function(text, mode) {
+      if (!voicePending) return;
+      endPending();
+      reply('LB_NATIVE_VOICE_RESULT', {text:String(text || ''), mode:mode || activeMode});
+    };
+    window.onAndroidVoiceError = function(message) {
+      if (!voicePending) return;
+      endPending();
+      reply('LB_NATIVE_VOICE_ERROR', {message:String(message || 'Voice recognition failed. Please try again.')});
+    };
+    window.onAndroidVoiceStatus = function(message) {
+      if (voicePending) reply('LB_NATIVE_VOICE_STATUS', {message:String(message || 'Listening…')});
+    };
+    window.addEventListener('message', function(event) {
+      if (!event.source || event.source === window || !trustedPortalOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'LB_NATIVE_VOICE_STOP') {
+        if (voiceClient && voiceClient.source !== event.source) return;
+        endPending();
+        try {
+          if (window.AndroidVoice && typeof window.AndroidVoice.stopRecognition === 'function') window.AndroidVoice.stopRecognition();
+        } catch (_) { /* A stopped recognizer may already be closed. */ }
+        return;
+      }
+      if (data.type !== 'LB_NATIVE_VOICE_REQUEST') return;
+      if (data.mode !== 'token' && data.mode !== 'confirmation') return;
+      if (voicePending) return;
+      voiceClient = {source:event.source, origin:event.origin};
+      activeMode = data.mode;
+      voicePending = true;
+      if (!window.AndroidVoice || typeof window.AndroidVoice.startRecognition !== 'function') {
+        window.onAndroidVoiceError('Native voice is unavailable. Open in the Laundry Bazaar Android app with voice support, or fill the form manually.');
+        return;
+      }
+      reply('LB_NATIVE_VOICE_STATUS', {message:'Opening Android voice recognition…'});
+      responseTimer = setTimeout(function() {
+        window.onAndroidVoiceError('No response from Android voice. Please check microphone permission and try again.');
+        try { if (typeof window.AndroidVoice.stopRecognition === 'function') window.AndroidVoice.stopRecognition(); } catch (_) {}
+      }, 60000);
+      try {
+        window.AndroidVoice.startRecognition(activeMode);
+      } catch (error) {
+        window.onAndroidVoiceError(error.message || 'Unable to open Android voice recognition.');
+      }
+    });
+  </script>
 </body>
 </html>
