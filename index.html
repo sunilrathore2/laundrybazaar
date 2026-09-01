@@ -1,52 +1,2255 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffa500">
-<title>Laundry Bazaar</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;font-family:Arial,sans-serif}
-#portal{display:block;width:100%;height:100%;height:100dvh;border:0}
-#help{position:fixed;right:8px;bottom:8px;max-width:320px;padding:8px;background:#fff8e8;border:1px solid #ffa500;border-radius:6px;font-size:13px;box-shadow:0 1px 5px #aaa}
-summary{cursor:pointer}#help p{margin:8px 0}button{padding:8px;cursor:pointer}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>Laundry Bazaar Management Portal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, body * { font-size: 12px !important; font-weight: 700 !important; }
+    html, body { width:100%; min-width:0; max-width:100%; min-height:100%; margin:0; overflow-x:hidden; }
+    html { overscroll-behavior-x:none; }
+    body { font-family:Arial, sans-serif; background:#f4f6fa; padding:0 0 28px; aspect-ratio:9 / 16; }
+    .tabs-grid { display:grid; grid-template-columns:repeat(var(--tab-cols, 4), minmax(0, 1fr)); width:100%; gap:2px; padding:2px; }
+    .tab { display:flex; align-items:center; justify-content:center; min-width:0; min-height:40px; background:#FFA500; color:#fff; padding:4px 2px; margin:0; cursor:pointer; border-radius:6px; text-align:center; overflow-wrap:anywhere; }
+    .tab.active { background: #fff; color: #FFA500; border: solid 1px #FFA500; border-bottom: none; }
+    .section { display: none; width:100%; padding:16px 12px; background: #fff; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 10px #e0e6f0; }
+    .section.active { display: block; }
+    .form-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+    .form-row label { min-width: 110px; }
+    .table-holder { background: #f0f2fd; padding: 16px; border-radius: 8px; margin-bottom: 10px; overflow-x:hidden;}
+    .token-card-list { display:grid; grid-template-columns:1fr; gap:10px; width:100%; }
+    .token-card { width:100%; padding:12px; border:1px solid #FFA500; border-radius:8px; background:#fff; }
+    .token-card.booked { border-color:#28a745; background:#d9f7df; }
+    .token-card-row { display:grid; grid-template-columns:105px minmax(0,1fr); gap:8px; margin-bottom:7px; align-items:start; }
+    .token-card-row:last-child { margin-bottom:0; }
+    .token-card-label { color:#444; }
+    .token-card-value { min-width:0; overflow-wrap:anywhere; }
+    .token-card-action { margin-top:10px; text-align:right; }
+    .btn { display: inline-block; padding: 8px 18px; border: none; border-radius: 4px; background: #FFA500; color: #fff; cursor: pointer; text-decoration: none; font-size: 14px; margin: 2px; }
+    .btn[disabled] { background: #ccc; cursor: not-allowed; }
+    .error { color: red; }
+    .success { color: green; }
+    .info { color: #0066cc; font-style: italic; }
+    #logoSection { width:100%; background:#fff; text-align:center; overflow:hidden; }
+    .logo { display:block; width:100%; max-width:100%; height:auto; object-fit:contain; margin:40px 0 0; }
+    .top-header {
+      display:grid;
+      grid-template-columns:60% 40%;
+      width:100%;
+      max-width:100%;
+      align-items:end;
+      background:#fff;
+      overflow:hidden;
+    }
+    .top-header #logoSection {
+      grid-column:1;
+      width:100% !important;
+      max-width:100% !important;
+      justify-self:start;
+    }
+    .top-header #userBar {
+      grid-column:2;
+      width:100% !important;
+      height:auto !important;
+      align-self:end !important;
+      margin:0 !important;
+      padding:0 10px !important;
+      text-align:right !important;
+      float:none !important;
+      font-size:12px !important;
+      font-weight:700 !important;
+      overflow-wrap:anywhere;
+      flex-direction:column !important;
+      align-items:flex-end !important;
+      justify-content:flex-end !important;
+      gap:4px;
+    }
+    .top-header #userBar .logout-btn {
+      background:#d32f2f !important;
+      color:#fff !important;
+      font-size:12px !important;
+      font-weight:700 !important;
+      min-height:28px !important;
+      padding:4px 8px !important;
+      margin:0 !important;
+    }
+    .payment-mode-buttons {
+      flex:1 1 0;
+      min-width:0;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:6px;
+    }
+    .payment-mode-buttons .payment-mode-btn {
+      width:100% !important;
+      min-height:38px !important;
+      background:#ddd !important;
+      color:#333 !important;
+      border:2px solid #FFA500 !important;
+    }
+    .payment-mode-buttons .payment-mode-btn.active {
+      background:#FFA500 !important;
+      color:#fff !important;
+    }
+    th, td { padding: 6px 12px; border: none; }
+    .bordered { border: 2px solid #FFA500; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #ffd580; text-align: center; padding: 6px; }
+    th { background: #FFA500; color: white; }
+    #printInvoiceBtn, #printTagBtn, #remoteInvoiceBtn, #remoteTagBtn { display: none; }
+    .recording { background:#d9534f !important; }
+    .audio-status { margin-left:8px; font-weight:bold; }
+    
+    .total-row td {
+      font-weight: bold;
+      font-size: 1.15em;
+      background: #fff0c2;
+      color: #444;
+      padding: 10px;
+      text-align: center;
+      border: none;
+    }
+
+    .reportTabBtn {
+      background-color: #eee;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 10px 18px;
+      margin-right: 4px;
+      font-weight: bold;
+      font-size: 15px;
+      border-radius: 8px 8px 0 0;
+      color: #444;
+      transition: background-color 0.3s ease;
+    }
+    .reportTabBtn:hover { background-color: #ddd; }
+    .reportTabBtn.active { background-color: #FFA500; color: white; }
+    
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #FFA500;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #deliveryRemarks {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      border: 1px solid #FFA500;
+      border-radius: 4px;
+      padding: 8px;
+      min-height: 60px;
+      resize: vertical;
+      transition: border-color 0.3s ease;
+      flex: 1;
+    }
+
+    #deliveryRemarks:focus {
+      outline: none;
+      border-color: #FF8C00;
+      box-shadow: 0 0 5px rgba(255, 165, 0, 0.3);
+    }
+
+    table td:nth-child(6) {
+      max-width: 200px;
+      word-wrap: break-word;
+      text-align: left;
+    }
+
+    .login-overlay { position: fixed; inset: 0; width:100%; background: #f4f6fa; display:flex; align-items:center; justify-content:center; padding:0; z-index:9999; }
+    .login-box { width:100%; max-width:none; background:#fff; border:2px solid #FFA500; border-radius:0; padding:25px; box-shadow:0 2px 15px #ddd; }
+    .login-box h2 { color:#FFA500; text-align:center; margin-top:0; }
+    .login-box input { width:100%; box-sizing:border-box; padding:10px; margin:6px 0 12px; border:1px solid #ccc; border-radius:4px; }
+    #loginError { margin-top:8px; }
+    .user-bar { float:right; margin:8px; font-size:13px; }
+    .admin-section {
+      background: #fff0c2;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+      border: 1px solid #FFA500;
+    }
+    input, select, textarea, button { max-width:100%; }
+    #tokenRemark { width:100%; min-height:78px; padding:9px; border:1px solid #FFA500; border-radius:4px; resize:vertical; font-family:Arial,sans-serif; }
+    @media (max-width: 600px) {
+      .form-row { align-items:center; }
+      .form-row label { flex:0 0 32%; width:32%; min-width:0; margin:0; }
+      .form-row input, .form-row select, .form-row textarea { flex:1 1 0; width:0; min-width:0; min-height:38px; }
+      .btn { min-height:42px; }
+      .table-holder { padding:8px; }
+      .user-bar { float:none; width:100%; margin:0; padding:8px 12px; text-align:right; }
+    }
+
+    html { font-size:12px !important; }
+    body, div, section, h1, h2, h3, h4, p, span, label, a,
+    input, select, option, textarea, button, table, thead, tbody, tr, th, td,
+    .tab, .btn, .reportTabBtn, .user-bar, .login-box, .section,
+    .form-row, .table-holder, .admin-section, .error, .success, .info {
+      font-family:Arial, sans-serif !important;
+      font-size:12px !important;
+      font-weight:700 !important;
+    }
+    h1, h2, h3, h4, h5, h6, .tab, .reportTabBtn, th {
+      font-size:12px !important;
+      font-weight:700 !important;
+    }
+    .section > h2 {
+      font-size:15px !important;
+      font-weight:700 !important;
+    }
+    #dailyOrdersReport, #dailyOrdersReport *,
+    #completedOrdersReport, #completedOrdersReport *,
+    #deliveryReport, #deliveryReport *,
+    #customerHistory, #customerHistory *,
+    #orderDateReport, #orderDateReport *,
+    #orderDateTotals, #orderDateTotals * {
+      font-size:11px !important;
+      font-weight:400 !important;
+    }
+    #itemsTable table {
+      width:100% !important;
+      max-width:100% !important;
+      table-layout:fixed !important;
+    }
+    #itemsTable th, #itemsTable td,
+    #itemsTable input, #itemsTable select, #itemsTable button {
+      font-size:11px !important;
+      font-weight:700 !important;
+    }
+    #itemsTable {
+      padding:0 !important;
+      margin-left:0 !important;
+      margin-right:0 !important;
+      background:transparent !important;
+      border-radius:0 !important;
+    }
+    #itemsTable th, #itemsTable td { padding:4px 2px !important; }
+    #itemsTable input, #itemsTable select { width:100% !important; min-width:0 !important; }
+    #itemsTable th:nth-child(1), #itemsTable td:nth-child(1) { width:16%; }
+    #itemsTable th:nth-child(2), #itemsTable td:nth-child(2) { width:31%; }
+    #itemsTable th:nth-child(3), #itemsTable td:nth-child(3) { width:17%; }
+    #itemsTable th:nth-child(4), #itemsTable td:nth-child(4) { width:14%; }
+    #itemsTable th:nth-child(5), #itemsTable td:nth-child(5) { width:17%; }
+    #itemsTable th:nth-child(6), #itemsTable td:nth-child(6) {
+      width:5% !important; min-width:0 !important; max-width:20px !important; padding:0 !important;
+    }
+    #itemsTable td:nth-child(6) .btn {
+      width:100% !important; min-width:0 !important; max-width:18px !important;
+      height:24px !important; min-height:24px !important;
+      padding:0 !important; margin:0 !important;
+    }
+    #itemsTable .remove-item-btn {
+      background:#dc3545 !important;
+      color:#fff !important;
+      border:0 !important;
+      font-size:16px !important;
+      line-height:1 !important;
+    }
+    #itemsTable .item-input-stack {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      width:100%;
+    }
+    #itemsTable .weight {
+      width:100% !important;
+    }
+    #orderBooking #phone {
+      width:0 !important;
+      min-width:0 !important;
+      flex:1 1 0 !important;
+    }
+    #orderBooking #phoneLoading,
+    #orderBooking #customerInfo {
+      flex:0 0 calc(68% - 12px) !important;
+      width:calc(68% - 12px) !important;
+      margin-left:calc(32% + 12px) !important;
+    }
+    #orderBooking #customerInfo:empty { display:none !important; }
+    .voice-token-panel { width:100%; padding:10px; margin:8px 0 12px; border:1px solid #FFA500; border-radius:7px; background:#fff8e8; }
+    .voice-token-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    #voiceTokenBtn { background:#1565c0 !important; }
+    #voiceTokenStopBtn { background:#666 !important; }
+    #voiceTokenTranscript { width:100%; min-height:54px; margin-top:8px; padding:7px; white-space:pre-wrap; overflow-wrap:anywhere; background:#fff; border:1px solid #ddd; border-radius:5px; }
+    #tokenItemsTable { width:100% !important; padding:0 !important; margin:0 0 10px !important; background:transparent !important; overflow-x:hidden !important; }
+    #tokenItemsTable table { width:100% !important; table-layout:fixed !important; border-collapse:collapse !important; }
+    #tokenItemsTable th, #tokenItemsTable td { padding:4px 2px !important; font-size:11px !important; }
+    #tokenItemsTable input, #tokenItemsTable select { width:100% !important; min-width:0 !important; font-size:11px !important; }
+    #tokenItemsTable th:nth-child(1), #tokenItemsTable td:nth-child(1) { width:20%; }
+    #tokenItemsTable th:nth-child(2), #tokenItemsTable td:nth-child(2) { width:45%; }
+    #tokenItemsTable th:nth-child(3), #tokenItemsTable td:nth-child(3) { width:29%; }
+    #tokenItemsTable th:nth-child(4), #tokenItemsTable td:nth-child(4) { width:6%; padding:0 !important; }
+    #tokenItemsTable .item-input-stack { display:flex; flex-direction:column; gap:4px; width:100%; }
+    #tokenItemsTable .token-remove-item { width:100% !important; min-width:0 !important; height:24px !important; min-height:24px !important; margin:0 !important; padding:0 !important; background:#dc3545 !important; color:#fff !important; font-size:16px !important; }
+    .login-field {
+      display:grid !important;
+      grid-template-columns:minmax(90px, 32%) minmax(0, 1fr);
+      gap:8px;
+      align-items:center;
+      width:100%;
+      margin:8px 0 12px;
+    }
+    .login-field label, .login-field input {
+      display:block !important;
+      width:100% !important;
+      min-width:0 !important;
+      margin:0 !important;
+    }
+    .login-box, .login-box * {
+      font-size:15px !important;
+      font-weight:700 !important;
+    }
+
+    html, body, #logoSection, .tabs-grid, .section, .form-row,
+    .table-holder, .admin-section, #searchResult, #invoicePreview,
+    #tagPreview, #tokenList, [id$="Report"], [id$="Div"] {
+      width:100% !important;
+      min-width:0 !important;
+      max-width:100% !important;
+      overflow-x:hidden !important;
+    }
+    body, body > *, .top-header, #itemsTable, #itemsTable table {
+      box-sizing:border-box !important;
+      width:100% !important;
+      min-width:0 !important;
+      max-width:100% !important;
+    }
+    img, svg, canvas, iframe, pre {
+      max-width:100% !important;
+    }
+    pre {
+      white-space:pre-wrap !important;
+      overflow-wrap:anywhere !important;
+    }
+    table {
+      width:100% !important;
+      max-width:100% !important;
+      table-layout:fixed !important;
+    }
+    th, td {
+      min-width:0 !important;
+      max-width:100% !important;
+      padding:4px 2px !important;
+      white-space:normal !important;
+      overflow-wrap:anywhere !important;
+      word-break:break-word !important;
+    }
+    input, select, textarea, button, .btn, .reportTabBtn {
+      min-width:0 !important;
+      max-width:100% !important;
+      white-space:normal !important;
+      overflow-wrap:anywhere !important;
+    }
+    td input, td select, td textarea, td button {
+      width:100% !important;
+    }
+    .login-box {
+      width:100% !important;
+      max-width:100% !important;
+    }
+    @media screen and (max-width: 900px) {
+      html, body {
+        position:relative !important;
+        left:0 !important;
+        right:0 !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        margin:0 !important;
+        overflow-x:clip !important;
+      }
+      body {
+        width:100% !important;
+        min-height:max(100vh, 177.7778vw) !important;
+        aspect-ratio:9 / 16 !important;
+      }
+      body > *, body * {
+        min-width:0 !important;
+        max-width:100% !important;
+      }
+      body > * {
+        width:100% !important;
+        margin-left:0 !important;
+        margin-right:0 !important;
+      }
+      .top-header, .tabs-grid, .section, .table-holder,
+      .form-row, .admin-section, #itemsTable {
+        inline-size:100% !important;
+        max-inline-size:100% !important;
+      }
+      .login-overlay {
+        inset:0 !important;
+        width:auto !important;
+        max-width:none !important;
+      }
+      .section {
+        contain:inline-size;
+      }
+      .form-row {
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:wrap !important;
+        align-items:center !important;
+      }
+      .form-row > label {
+        width:32% !important;
+        flex:0 0 32% !important;
+      }
+      .form-row > input, .form-row > select, .form-row > textarea {
+        width:0 !important;
+        flex:1 1 0 !important;
+      }
+      .tabs-grid {
+        grid-template-columns:repeat(var(--tab-cols, 4), minmax(0, 1fr)) !important;
+      }
+      .tab {
+        width:auto !important;
+        padding:8px 1px !important;
+      }
+    }
+    @supports (height:100svh) {
+      @media screen and (max-width:900px) {
+        body { min-height:max(100svh, 177.7778vw) !important; }
+      }
+    }
+  </style>
 </head>
 <body>
-<iframe id="portal" title="Laundry Bazaar Management Portal" allow="microphone *; clipboard-read *; clipboard-write *; fullscreen *" referrerpolicy="strict-origin-when-cross-origin" src="https://script.google.com/macros/s/AKfycbyYyI3gcFLFuUZnqtdCq7hBfNen287bbJzXnAvkim9xXFU1gg8J4hHhwEHx6ikuqU65/exec"></iframe>
-<details id="help"><summary>Loading problem?</summary><p>If Google displays “refused to connect” or “content blocked”, the Apps Script deployment must allow embedding. This page cannot override Google's access restrictions.</p><button type="button" id="reload">Reload portal</button></details>
-<script>
-'use strict';
-const portal=document.getElementById('portal');
-document.getElementById('reload').addEventListener('click',function(){portal.src=portal.getAttribute('src');});
-// There is deliberately no top-level redirect. The GitHub address stays visible.
-// Native interface contract: startRecognition(mode), stopRecognition(),
-// and onAndroidVoiceResult(text, mode)/onAndroidVoiceError(message) callbacks.
-let voiceClient=null,activeMode='token',voicePending=false,responseTimer=null;
-function trustedPortalOrigin(origin){
- try{const u=new URL(origin);return u.protocol==='https:'&&(u.hostname==='script.google.com'||u.hostname==='script.googleusercontent.com'||u.hostname.endsWith('.googleusercontent.com'));}catch(_){return false;}
-}
-function reply(type,fields){if(voiceClient)voiceClient.source.postMessage(Object.assign({type:type},fields),voiceClient.origin);}
-function endPending(){voicePending=false;clearTimeout(responseTimer);responseTimer=null;}
-window.onAndroidVoiceResult=function(text,mode){if(!voicePending)return;endPending();reply('LB_NATIVE_VOICE_RESULT',{text:String(text||''),mode:mode||activeMode});};
-window.onAndroidVoiceError=function(message){if(!voicePending)return;endPending();reply('LB_NATIVE_VOICE_ERROR',{message:String(message||'Voice recognition failed. Please try again.')});};
-window.onAndroidVoiceStatus=function(message){if(voicePending)reply('LB_NATIVE_VOICE_STATUS',{message:String(message||'Listening…')});};
-window.addEventListener('message',function(event){
- if(!event.source||event.source===window||!trustedPortalOrigin(event.origin))return;
- const data=event.data;if(!data||typeof data!=='object')return;
- if(data.type==='LB_NATIVE_VOICE_STOP'){
-  if(voiceClient&&voiceClient.source!==event.source)return;
-  endPending();try{if(window.AndroidVoice&&typeof window.AndroidVoice.stopRecognition==='function')window.AndroidVoice.stopRecognition();}catch(_){}return;
- }
- if(data.type!=='LB_NATIVE_VOICE_REQUEST'||(data.mode!=='token'&&data.mode!=='confirmation')||voicePending)return;
- voiceClient={source:event.source,origin:event.origin};activeMode=data.mode;voicePending=true;
- if(!window.AndroidVoice||typeof window.AndroidVoice.startRecognition!=='function'){
-  window.onAndroidVoiceError('Open in the Laundry Bazaar Android app with native voice support, or fill the form manually.');return;
- }
- reply('LB_NATIVE_VOICE_STATUS',{message:'Opening Android voice recognition…'});
- responseTimer=setTimeout(function(){window.onAndroidVoiceError('No response from Android voice. Check microphone permission and try again.');try{if(typeof window.AndroidVoice.stopRecognition==='function')window.AndroidVoice.stopRecognition();}catch(_){}},60000);
- try{window.AndroidVoice.startRecognition(activeMode);}catch(error){window.onAndroidVoiceError(error.message);}
-});
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <h2>Laundry Bazaar Login</h2>
+      <div class="login-field"><label>Username</label><input id="loginUsername" autocomplete="username"></div>
+      <div class="login-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()"></div>
+      <button class="btn" style="width:100%;" onclick="doLogin()">Login</button>
+      <div id="loginError" class="error"></div>
+    </div>
+  </div>
+  <div class="top-header">
+    <div id="logoSection"><img id="portalLogo" src="" class="logo" /></div>
+    <div id="userBar" class="user-bar" style="display:none;"></div>
+  </div>
+  <div class="tabs-grid">
+    <div class="tab active" id="tab_orderBooking" onclick="showTab('orderBooking', event)">Order</div>
+    <div class="tab" onclick="showTab('deliverySection', event)">Delivery</div>
+    <div class="tab" onclick="showTab('invoiceSection', event)">Invoices</div>
+    <div class="tab" onclick="showTab('tagSection', event)">Tags</div>
+    <div class="tab" onclick="showTab('reportSection', event)">Reports</div>
+    <div class="tab" onclick="showTab('logoUpload', event)">Logo</div>
+    <div class="tab" id="tab_token" onclick="showTab('tokenSection', event)">Token</div>
+    <div class="tab" onclick="showTab('adminSection', event)">Admin</div>
+  </div>
+
+  <!-- Order Booking -->
+  <div id="orderBooking" class="section active">
+    <h2>Order Booking</h2>
+    <div class="form-row">
+      <label>Order Number:</label>
+      <input type="text" id="orderNumber" readonly>
+      <button class="btn" onclick="addNewOrder()">Add New</button>
+    </div>
+    <div class="form-row">
+      <label>Order Date:</label>
+      <input type="date" id="orderDate" readonly>
+    </div>
+    <div class="form-row">
+      <label>Phone:</label>
+      <input type="text" id="phone" maxlength="10" pattern="[0-9]{10}" title="Enter exactly 10 digits" autocomplete="off" oninput="lookupCustomer()">
+      <span id="phoneLoading" class="loading" style="display:none;"></span>
+      <span id="customerInfo" class="info" style="margin-left: 8px;"></span>
+    </div>
+    <div class="form-row">
+      <label>Name:</label>
+      <input type="text" id="customerName" autocomplete="off" oninput="capitalizeInput(this)">
+    </div>
+    <div class="form-row">
+      <label>Delivery Date:</label>
+      <input type="date" id="deliveryDate">
+    </div>
+    <div class="table-holder" id="itemsTable"></div>
+    <button class="btn" id="addItemBtn" onclick="addItemRow()">Add Item</button>
+    <div class="form-row">
+      <label>Total Amount:</label>
+      <input type="text" id="totalAmount" readonly style="width: 120px;">
+    </div>
+    <div class="form-row">
+      <label>Total Quantity:</label>
+      <input type="text" id="totalQuantity" readonly style="width: 80px;">
+    </div>
+    <span id="orderError" class="error"></span>
+    <button class="btn" id="saveOrderBtn" onclick="saveOrder()">Save Order</button>
+    <button class="btn" id="whatsappInvoiceBtn" style="display:none;" onclick="saveAndSendInvoiceWhatsapp()">Open WhatsApp</button>
+    <button class="btn" id="printInvoiceBtn" onclick="printInvoice()">Print Invoice</button>
+    <button class="btn" id="printTagBtn" onclick="printTag()">Print Tag</button>
+    <button class="btn" id="remoteInvoiceBtn" onclick="remotePrintInvoiceFromOrder()">Remote Invoice</button>
+    <button class="btn" id="remoteTagBtn" onclick="remotePrintTagFromOrder()">Remote Tag</button>
+  </div>
+
+  <!-- Delivery Section -->
+  <div id="deliverySection" class="section">
+    <h2>Delivery</h2>
+    <div class="form-row">
+      <label>Order Number:</label>
+      <input type="text" id="searchOrderNumber" placeholder="Order Number">
+      <button class="btn" onclick="searchOrder()">Search</button>
+    </div>
+    <div id="searchResult"></div>
+  </div>
+
+  <!-- Invoice Section -->
+  <div id="invoiceSection" class="section">
+    <h2>Invoice Section</h2>
+    <label>Order Number:</label>
+    <input type="text" id="invoiceOrderNo" autocomplete="off">
+    <button class="btn" onclick="printInvoiceFromTab()">Generate Invoice</button>
+    <button class="btn" onclick="remotePrintInvoiceFromTab()">Remote Print Invoice</button>
+    <div id="invoicePreview"></div>
+    <hr>
+    <div style="margin-top:12px;">
+      <input type="text" id="statusOrderNo" placeholder="Order Number" autocomplete="off">
+      <button class="btn" onclick="checkOrderStatus()">Check Status</button>
+      <span id="orderStatusResult"></span>
+      <button class="btn" id="completeOrderBtn" style="display:none;" onclick="markOrderCompleted()">Mark as Completed</button>
+    </div>
+  </div>
+
+  <!-- Tag Section -->
+  <div id="tagSection" class="section">
+    <h2>Tag Printing</h2>
+    <label>Order Number:</label>
+    <input type="text" id="tagOrderNo" autocomplete="off">
+    <button class="btn" onclick="printTagFromTab()">Print Tag</button>
+    <button class="btn" onclick="remotePrintTagFromTab()">Remote Print Tag</button>
+    <div id="tagPreview"></div>
+  </div>
+
+  <!-- Reports Section -->
+  <div id="reportSection" class="section">
+    <h2>Reports</h2>
+    <div class="tab" style="background:#FFA500; color:#fff; border-radius: 8px 8px 0 0;">
+      <button class="reportTabBtn active" onclick="showReportTab(event, 'dailyOrdersDiv')">Pending Order Report</button>
+      <button class="reportTabBtn" onclick="showReportTab(event, 'completedOrdersDiv')">Completed Order Report</button>
+      <button class="reportTabBtn" onclick="showReportTab(event, 'deliveryReportDiv')">Delivery Report</button>
+      <button class="reportTabBtn" onclick="showReportTab(event, 'customerHistoryDiv')">Customer History</button>
+      <button class="reportTabBtn" onclick="showReportTab(event, 'orderDateReportDiv')">Order Date Report</button>
+    </div>
+
+    <div id="dailyOrdersDiv" class="reportTabContent" style="padding:12px; border: 1px solid #FFA500; border-top: none;">
+      <button class="btn" onclick="generateDailyOrders()">Show Pending Order Report</button>
+      <button class="btn" onclick="printDailyOrders()">Print / PDF</button>
+      <div id="dailyOrdersReport"></div>
+    </div>
+    <div id="completedOrdersDiv" class="reportTabContent" style="display:none; padding:12px; border: 1px solid #FFA500; border-top: none;">
+      <button class="btn" onclick="generateCompletedOrders()">Show Completed Order Report</button>
+      <button class="btn" onclick="printCompletedOrders()">Print / PDF</button>
+      <div id="completedOrdersReport"></div>
+    </div>
+
+    <div id="deliveryReportDiv" class="reportTabContent" style="display:none; padding:12px; border: 1px solid #FFA500; border-top: none;">
+      <label>From:</label><input type="date" id="deliveryStart">
+      <label>To:</label><input type="date" id="deliveryEnd">
+      <button class="btn" onclick="generateDeliveryReport()">Show Report</button>
+      <button class="btn" onclick="printDeliveryReport()">Print / PDF</button>
+      <div id="deliveryReport"></div>
+    </div>
+
+    <div id="customerHistoryDiv" class="reportTabContent" style="display:none; padding:12px; border: 1px solid #FFA500; border-top: none;">
+      <input type="text" id="custPhone" placeholder="Phone Number" autocomplete="off" style="margin-right: 12px;">
+      <button class="btn" onclick="generateCustomerHistory()">Show Report</button>
+      <button class="btn" onclick="printCustomerHistory()">Print / PDF</button>
+      <div id="customerHistory"></div>
+    </div>
+
+    <div id="orderDateReportDiv" class="reportTabContent" style="display:none; padding:12px; border: 1px solid #FFA500; border-top: none;">
+      <label>From:</label><input type="date" id="orderDateStart" style="margin-right:12px;">
+      <label>To:</label><input type="date" id="orderDateEnd" style="margin-right:12px;">
+      <button class="btn" onclick="generateOrderDateReport()">Show Report</button>
+      <button class="btn" onclick="printOrderDateReport()">Print / PDF</button>
+      <div id="orderDateReport"></div>
+      <div id="orderDateTotals" style="margin-top:10px; font-weight:bold;"></div>
+    </div>
+  </div>
+
+  <!-- Logo Upload Section -->
+  <div id="logoUpload" class="section">
+    <h2>Logo Upload</h2>
+    <input type="file" id="logoInput" accept="image/*">
+    <button class="btn" onclick="uploadLogo()">Upload Logo</button>
+  </div>
+
+  <!-- Token Section -->
+  <div id="tokenSection" class="section">
+    <h2>Voice Token / Preliminary Order</h2>
+    <div class="voice-token-panel">
+      <div class="voice-token-actions">
+        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken()">Start Voice Token</button>
+        <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
+        <span id="voiceTokenStatus" class="info">Hindi, English and Hinglish supported.</span>
+      </div>
+      <div id="voiceTokenTranscript">Say customer name, phone and delivery date, then Quantity–Item–Service: “2 shirt WI, 3 pant WF, 1 blazer DC”. Hindi item names supported: “दो सूती साड़ी DC”, “एक लहंगा तीन अस्तर DC”, “दो शर्ट धो के प्रेस करना”. Mention single/double, plain/fancy or material when needed. Add remark if needed. Enter rates later in Book Order.</div>
+    </div>
+    <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly><button class="btn" onclick="newToken()">New</button></div>
+    <div class="form-row"><label>Token Date:</label><input type="date" id="tokenDate"></div>
+    <div class="form-row"><label>Phone:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
+    <div class="form-row"><label>Name:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
+    <div class="form-row"><label>Delivery Date:</label><input type="date" id="tokenDeliveryDate"></div>
+    <div id="tokenItemsTable" class="table-holder"></div>
+    <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">Add Item</button>
+    <div class="form-row"><label>Total Quantity:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
+    <div class="form-row"><label>Remark:</label><textarea id="tokenRemark" rows="3" placeholder="Enter token remark..."></textarea></div>
+
+    <button class="btn" id="saveTokenBtn" onclick="saveTokenBooking()">Save Token</button>
+    <button class="btn" id="refreshTokensBtn" onclick="loadTokens()">Refresh Tokens</button>
+    <div id="tokenError" class="error"></div>
+    <div id="tokenTableArea">
+      <h3 style="margin:16px 0 8px; font-size:15px;">Token Details</h3>
+      <div id="tokenList" class="table-holder"><div class="info">Open the Token tab to load token details.</div></div>
+    </div>
+  </div>
+
+  <!-- Admin Section -->
+  <div id="adminSection" class="section">
+    <h2>Admin Functions</h2>
+    <div class="admin-section">
+      <h3>Daily Email Reports</h3>
+      <button class="btn" onclick="manualSendDailyReport()">Send Test Daily Report</button>
+      <button class="btn" onclick="createEmailTrigger()">Setup Auto Email (4 AM Daily)</button>
+      <button class="btn" onclick="checkEmailTriggers()">Check Email Triggers</button>
+      <button class="btn" onclick="testSystem()">Test System</button>
+      <div id="adminResult" style="margin-top: 10px;"></div>
+      <hr>
+      <h3>Telegram Bot</h3>
+      <div class="form-row"><label>Bot Token:</label><input id="telegramBotToken" type="text" style="min-width:320px;"></div>
+      <div class="form-row"><label>Chat ID:</label><input id="telegramChatId" type="text"></div>
+      <button class="btn" onclick="saveTelegram()">Save Telegram Settings</button>
+      <button class="btn" onclick="testTelegramBot()">Send Test Message</button>
+      <div id="telegramResult"></div>
+    </div>
+  </div>
+
+  <script>
+// This page runs directly on GitHub Pages; only data requests go to Apps Script.
+window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIbZxp7e4TkbVp1AV5oXu5EkJqUHl69FfA3CqS9CzUmoMjRX9hS/exec';
+(function(){
+  function runner(success, failure, userObject){
+    return new Proxy({}, {get:function(_, name){
+      if(name === 'withSuccessHandler') return function(fn){return runner(fn,failure,userObject);};
+      if(name === 'withFailureHandler') return function(fn){return runner(success,fn,userObject);};
+      if(name === 'withUserObject') return function(value){return runner(success,failure,value);};
+      if(name === 'then') return undefined;
+      return function(){
+        var args=Array.prototype.slice.call(arguments);
+        fetch(window.LB_API_URL, {
+          method:'POST', redirect:'follow', credentials:'omit',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body:JSON.stringify({api:'laundry-bazaar-v1',method:name,args:args})
+        }).then(async function(response){
+          if(!response.ok) throw new Error('API HTTP '+response.status+'. Check the Apps Script deployment.');
+          var text=await response.text(), data;
+          try{data=JSON.parse(text);}catch(_){throw new Error('Backend is not ready. Add GitHubAPI.gs and deploy a New version of the same web app with anonymous web access.');}
+          if(!data || typeof data.ok !== 'boolean') throw new Error('Unexpected backend response.');
+          if(!data.ok) throw new Error(data.error || 'Request failed.');
+          if(success) success(data.result,userObject);
+        }).catch(function(error){
+          if(error instanceof TypeError) error=new Error('Cannot reach the backend. Check deployment access and connection. If saving, check the records before retrying; the request may have completed.');
+          if(failure) failure(error,userObject);else alert(error.message);
+        });
+      };
+    }});
+  }
+  window.google={script:{run:runner(null,null,null)}};
+})();
 </script>
+
+<script>
+    function capitalizeWords(text) {
+      if (!text || text.trim() === '') return '';
+      return text.toString()
+        .toLowerCase()
+        .split(' ')
+        .map(function(word){ return word.charAt(0).toUpperCase() + word.slice(1); })
+        .join(' ')
+        .trim();
+    }
+
+    function capitalizeInput(inputElement) {
+      const cursorPosition = inputElement.selectionStart;
+      const originalValue = inputElement.value;
+      inputElement.value = capitalizeWords(originalValue);
+      inputElement.setSelectionRange(cursorPosition, cursorPosition);
+    }
+
+    function showTab(tabId, evt) {
+      document.querySelectorAll('.section').forEach(function(div){ div.classList.remove('active'); });
+      document.querySelectorAll('.tab').forEach(function(tab){ tab.classList.remove('active'); });
+      const section = document.getElementById(tabId);
+      if (!section) return;
+      section.classList.add('active');
+      if (evt && evt.currentTarget) {
+        evt.currentTarget.classList.add('active');
+      } else {
+        document.querySelectorAll('.tab').forEach(function(t){
+          if (t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(tabId) !== -1) t.classList.add('active');
+        });
+      }
+      if (tabId === 'tokenSection' && getActiveSessionToken() && currentUser) {
+        loadTokens();
+      }
+    }
+
+    function showReportTab(evt, tabId) {
+      document.querySelectorAll('.reportTabContent').forEach(function(div){ div.style.display = 'none'; });
+      document.querySelectorAll('.reportTabBtn').forEach(function(btn){ btn.classList.remove('active'); });
+      document.getElementById(tabId).style.display = 'block';
+      evt.currentTarget.classList.add('active');
+    }
+
+    let serviceOptions = [];
+    let lookupTimeout = null;
+
+    let sessionToken = localStorage.getItem('lbSession') || '';
+    let currentUser = null;
+    let sourceTokenNumber = '';
+    let voiceTokenRecognition = null;
+    let voiceTokenConfirmRecognition = null;
+
+    window.onload = function() {
+      if (sessionToken) {
+        google.script.run
+          .withSuccessHandler(function(res){
+            if (res && res.success) {
+              activateSession({token:sessionToken, username:res.username, role:res.role});
+            } else {
+              localStorage.removeItem('lbSession');
+              sessionToken='';
+              document.getElementById('loginUsername').focus();
+            }
+          })
+          .withFailureHandler(function(){
+            localStorage.removeItem('lbSession');
+            sessionToken='';
+            document.getElementById('loginUsername').focus();
+          })
+          .getSession(sessionToken);
+      } else {
+        document.getElementById('loginUsername').focus();
+      }
+    };
+
+    function getActiveSessionToken() {
+      var stored = localStorage.getItem('lbSession') || '';
+      if (stored) sessionToken = stored;
+      return sessionToken || '';
+    }
+
+    function activateSession(res) {
+      var normalizedRole = String(res.role||'').trim().toLowerCase();
+      sessionToken = res.token || sessionToken;
+      currentUser = {username:res.username, role:normalizedRole};
+      localStorage.setItem('lbSession', sessionToken);
+      document.getElementById('loginOverlay').style.display='none';
+      var userBar = document.getElementById('userBar');
+      userBar.style.display='flex';
+      userBar.style.flexDirection='column';
+      userBar.style.alignItems='flex-end';
+      userBar.style.justifyContent='center';
+      userBar.textContent='';
+      var logoutButton = document.createElement('button');
+      logoutButton.type='button';
+      logoutButton.className='btn logout-btn';
+      logoutButton.textContent='Logout';
+      logoutButton.onclick=doLogout;
+      userBar.appendChild(logoutButton);
+      applyRole(normalizedRole);
+      google.script.run.withSuccessHandler(setLogo).getLogo(getActiveSessionToken());
+      google.script.run.withSuccessHandler(setServices).getServices(getActiveSessionToken());
+      addNewOrder();
+      if(normalizedRole==='admin') loadTelegramSettings();
+      if(normalizedRole==='delivery' || normalizedRole==='admin' || normalizedRole==='manager') { newToken(); loadTokens(); }
+    }
+
+    function doLogin() {
+      const u = document.getElementById('loginUsername').value.trim();
+      const p = document.getElementById('loginPassword').value;
+      sessionToken = '';
+      document.getElementById('loginError').textContent = '';
+      google.script.run.withSuccessHandler(function(res){
+        if(!res || !res.success){ document.getElementById('loginError').textContent = (res&&res.message)||'Login failed'; return; }
+        activateSession(res);
+      }).withFailureHandler(function(e){ document.getElementById('loginError').textContent = 'Login error: '+e; }).login(u,p);
+    }
+
+    function showLoginScreen(){
+      var userBar = document.getElementById('userBar');
+      userBar.style.display='none';
+      userBar.textContent='';
+      document.getElementById('loginPassword').value='';
+      document.getElementById('loginError').textContent='';
+      document.getElementById('loginOverlay').style.display='flex';
+      setTimeout(function(){ document.getElementById('loginUsername').focus(); }, 0);
+    }
+
+    function doLogout(){
+      var t = getActiveSessionToken();
+      localStorage.removeItem('lbSession');
+      sessionToken = '';
+      currentUser = null;
+      showLoginScreen();
+      if(t){
+        google.script.run
+          .withSuccessHandler(function(){})
+          .withFailureHandler(function(){})
+          .logout(t);
+      }
+    }
+
+    function applyRole(role){
+      role = String(role||'').trim().toLowerCase();
+      const map = {
+        orderBooking:['admin','manager'],
+        deliverySection:['admin','manager','delivery'],
+        invoiceSection:['admin','manager'],
+        tagSection:['admin','manager'],
+        reportSection:['admin','manager'],
+        logoUpload:['admin'],
+        tokenSection:['admin','manager','delivery'],
+        adminSection:['admin']
+      };
+      document.querySelectorAll('.tab').forEach(function(t){ t.style.display=''; });
+      Object.keys(map).forEach(function(id){
+        var el = document.getElementById(id);
+        if(el){
+          var tab = document.querySelector('[onclick*="' + id + '"]');
+          if(map[id].indexOf(role) < 0){
+            if(el) el.style.display='none';
+            if(tab) tab.style.display='none';
+          }
+        }
+      });
+      var tabsGrid = document.querySelector('.tabs-grid');
+      if(tabsGrid){
+        var visibleTabs = Array.from(tabsGrid.children).filter(function(t){
+          return t.classList.contains('tab') && t.style.display!=='none';
+        }).length;
+        var cols = visibleTabs>=7?4:(visibleTabs>=5?3:Math.max(1,Math.min(4,visibleTabs)));
+        tabsGrid.style.setProperty('--tab-cols', cols);
+      }
+      var tokenTableArea = document.getElementById('tokenTableArea');
+      var refreshTokensBtn = document.getElementById('refreshTokensBtn');
+      if(tokenTableArea) tokenTableArea.style.display='block';
+      if(refreshTokensBtn) refreshTokensBtn.style.display='inline-block';
+      if(role==='delivery'){ showTab('tokenSection'); }
+    }
+
+    function lookupTokenCustomer(){
+      const p = document.getElementById('tokenPhone').value.trim();
+      if(/^\d{10}$/.test(p)){
+        google.script.run.withSuccessHandler(function(n){
+          if(n) document.getElementById('tokenCustomerName').value=n;
+        }).getCustomerByPhone(p, getActiveSessionToken());
+      }
+    }
+
+    function newToken(){
+      google.script.run.withSuccessHandler(function(n){
+        document.getElementById('tokenNumber').value = n;
+        document.getElementById('tokenDate').value = new Date().toISOString().slice(0,10);
+        document.getElementById('tokenCustomerName').value = '';
+        document.getElementById('tokenPhone').value = '';
+        document.getElementById('tokenDeliveryDate').value = new Date().toISOString().slice(0,10);
+        document.getElementById('tokenQuantity').value = 0;
+        document.getElementById('tokenRemark').value = '';
+        renderTokenItemsTable([]);
+        document.getElementById('saveTokenBtn').disabled = false;
+        document.getElementById('tokenError').textContent = '';
+      }).withFailureHandler(function(e){
+        document.getElementById('tokenError').textContent = 'Unable to get new token number: '+(e.message||e);
+      }).getNewTokenNumber(getActiveSessionToken());
+    }
+
+    function saveTokenBooking(){
+      const items = getTokenItems();
+      const obj = {
+        tokenNumber: document.getElementById('tokenNumber').value,
+        tokenDate: document.getElementById('tokenDate').value,
+        customerName: document.getElementById('tokenCustomerName').value.trim(),
+        phone: document.getElementById('tokenPhone').value.trim(),
+        quantity: document.getElementById('tokenQuantity').value,
+        deliveryDate: document.getElementById('tokenDeliveryDate').value,
+        totalAmount: 0, // Compatibility with the existing token backend; pricing starts in Book Order.
+        items: items,
+        remark: document.getElementById('tokenRemark').value.trim()
+      };
+      if(!obj.customerName) return alert('Customer Name required.');
+      if(!/^\d{10}$/.test(obj.phone)) return alert('Phone must be exactly 10 digits.');
+      if(!obj.deliveryDate) return alert('Delivery Date required.');
+      if(!items.length || items.some(function(it){ return !it.service || !it.item || Number(it.qty)<=0; })) {
+        return alert('Enter valid Service, Item and Quantity.');
+      }
+
+      document.getElementById('saveTokenBtn').disabled = true;
+      google.script.run
+        .withSuccessHandler(function(n){
+          document.getElementById('tokenError').textContent = 'Token Saved: '+n+' | Status: Pending';
+          document.getElementById('tokenError').className = 'success';
+          loadTokens();
+          newToken();
+        })
+        .withFailureHandler(function(e){
+          document.getElementById('tokenError').textContent = 'Error: '+(e.message||e);
+          document.getElementById('tokenError').className = 'error';
+          document.getElementById('saveTokenBtn').disabled = false;
+        })
+        .saveToken(obj, getActiveSessionToken());
+    }
+
+    function getTokenItems(){
+      return Array.from(document.querySelectorAll('.tokenItemRow')).map(function(row){
+        return {
+          service: row.querySelector('.token-service').value,
+          item: row.querySelector('.token-item').value.trim(),
+          rate: 0,
+          qty: Number(row.querySelector('.token-qty').value)||0,
+          weight: Number(row.querySelector('.token-weight').value)||0,
+          amt: 0
+        };
+      });
+    }
+
+    function renderTokenItemsTable(items){
+      items = Array.isArray(items) && items.length ? items : [{service:'',item:'',rate:'',qty:1,weight:'',amt:0}];
+      var html = '<table><thead><tr><th>Qty</th><th>Item</th><th>Service</th><th></th></tr></thead><tbody>';
+      items.forEach(function(it, i){
+        var options = serviceOptions.map(function(opt){
+          return '<option '+(String(it.service||'').trim().toLowerCase()===String(opt||'').trim().toLowerCase()?'selected':'')+'>'+escapeHtml(opt)+'</option>';
+        }).join('');
+        html += '<tr class="tokenItemRow">'+
+          '<td><input class="token-qty" type="number" min="1" step="1" value="'+(Number(it.qty)||1)+'" oninput="calcTokenItemRow(this)"></td>'+
+          '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"></div></td>'+
+          '<td><select class="token-service" onchange="handleTokenServiceChange(this)"><option value="">Select</option>'+options+'</select></td>'+
+          '<td>'+(items.length>1?'<button class="btn token-remove-item" type="button" onclick="removeTokenItemRow('+i+')">&times;</button>':'')+'</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('tokenItemsTable').innerHTML = html;
+      document.querySelectorAll('.token-service').forEach(handleTokenServiceChange);
+      calcTokenTotals();
+    }
+
+    function addTokenItemRow(){
+      var items = getTokenItems();
+      items.push({service:'',item:'',rate:'',qty:1,weight:'',amt:0});
+      renderTokenItemsTable(items);
+    }
+
+    function removeTokenItemRow(index){
+      var items = getTokenItems();
+      items.splice(index, 1);
+      renderTokenItemsTable(items);
+    }
+
+    function handleTokenServiceChange(select){
+      var row = select.closest('tr');
+      if(!row) return;
+      var isKg = String(select.value||'').trim().toUpperCase() === 'KG';
+      var weight = row.querySelector('.token-weight');
+      weight.disabled = !isKg;
+      weight.style.display = isKg ? 'block' : 'none';
+      if(!isKg) weight.value = '';
+      calcTokenItemRow(select);
+    }
+
+    function calcTokenItemRow(el){
+      calcTokenTotals();
+    }
+
+    function calcTokenTotals(){
+      var qty = 0;
+      document.querySelectorAll('.tokenItemRow').forEach(function(row){
+        qty += Number(row.querySelector('.token-qty').value)||0;
+      });
+      document.getElementById('tokenQuantity').value = qty;
+    }
+
+    function voiceRecognitionClass_(){ 
+      return window.SpeechRecognition || window.webkitSpeechRecognition || null; 
+    }
+
+    function stopVoiceToken(){
+      if(voiceTokenRecognition) try{ voiceTokenRecognition.abort(); } catch(e){}
+      if(voiceTokenConfirmRecognition) try{ voiceTokenConfirmRecognition.abort(); } catch(e){}
+      if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')) {
+        if(window.AndroidVoice && typeof window.AndroidVoice.stopRecognition === 'function') window.AndroidVoice.stopRecognition();
+      } else if(window.AndroidVoice && typeof window.AndroidVoice.stopRecognition === 'function') {
+        if(window.AndroidVoice && typeof window.AndroidVoice.stopRecognition === 'function') window.AndroidVoice.stopRecognition();
+      }
+      if(window.speechSynthesis) window.speechSynthesis.cancel();
+      voiceTokenRecognition = null;
+      voiceTokenConfirmRecognition = null;
+      document.getElementById('voiceTokenBtn').disabled = false;
+      document.getElementById('voiceTokenStopBtn').disabled = true;
+      document.getElementById('voiceTokenStatus').textContent = 'Voice stopped.';
+    }
+
+    function startVoiceToken(){
+      var status = document.getElementById('voiceTokenStatus');
+      
+      if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')){
+        stopVoiceToken();
+        document.getElementById('voiceTokenBtn').disabled = true;
+        document.getElementById('voiceTokenStopBtn').disabled = false;
+        status.textContent = 'Connecting to Android microphone...';
+        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('token'); else window.onAndroidVoiceError('This Android app needs native voice support.');
+        return;
+      }
+      
+      if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function'){
+        stopVoiceToken();
+        document.getElementById('voiceTokenBtn').disabled = true;
+        document.getElementById('voiceTokenStopBtn').disabled = false;
+        status.textContent = 'Connecting to Android microphone...';
+        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('token'); else window.onAndroidVoiceError('This Android app needs native voice support.');
+        return;
+      }
+
+
+      var Recognition = voiceRecognitionClass_();
+      if(!Recognition){ 
+        status.textContent = 'Speech recognition not supported in this browser. Use Chrome directly.';
+        alert('Voice recognition is not supported in this browser. Please open in Google Chrome directly.');
+        return; 
+      }
+      
+      stopVoiceToken();
+      document.getElementById('voiceTokenBtn').disabled = true;
+      document.getElementById('voiceTokenStopBtn').disabled = false;
+      status.textContent = 'Listening... Speak Hindi, English or Hinglish.';
+      
+      try {
+        var recognition = new Recognition();
+        voiceTokenRecognition = recognition;
+        recognition.lang = 'hi-IN';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 3;
+        
+        recognition.onresult = function(event){
+          var alternatives = event.results[event.results.length - 1];
+          var primary = alternatives[0].transcript;
+          document.getElementById('voiceTokenTranscript').textContent = primary;
+          var parsed = parseVoiceToken_(primary);
+          fillVoiceTokenForm_(parsed);
+          if(parsed.items.length) confirmVoiceToken_(primary);
+        };
+        
+        recognition.onerror = function(event){
+          var msg = 'Voice error: ' + event.error;
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            msg = 'Microphone permission denied. Allow mic access in browser site settings.';
+          } else if (event.error === 'no-speech') {
+            msg = 'No speech detected. Tap Start Voice Token to retry.';
+          }
+          status.textContent = msg;
+          document.getElementById('voiceTokenBtn').disabled = false;
+          document.getElementById('voiceTokenStopBtn').disabled = true;
+        };
+        
+        recognition.onend = function(){ 
+          voiceTokenRecognition = null; 
+          document.getElementById('voiceTokenBtn').disabled = false;
+          document.getElementById('voiceTokenStopBtn').disabled = true;
+        };
+        
+        recognition.start();
+      } catch(e) {
+        status.textContent = 'Unable to start microphone: ' + e.message;
+        document.getElementById('voiceTokenBtn').disabled = false;
+        document.getElementById('voiceTokenStopBtn').disabled = true;
+      }
+    }
+
+    function normalizeVoiceDigits_(text){
+      var devanagari = '०१२३४५६७८९';
+      text = String(text||'').replace(/[०-९]/g, function(d){ return String(devanagari.indexOf(d)); });
+      var map = {zero:'0',oh:'0',one:'1',two:'2',three:'3',four:'4',five:'5',six:'6',seven:'7',eight:'8',nine:'9',ten:'10',eleven:'11',twelve:'12',das:'10',gyarah:'11',barah:'12','दस':'10','ग्यारह':'11','बारह':'12','पाँच':'5',shunya:'0',ek:'1',do:'2',teen:'3',char:'4',chaar:'4',panch:'5',che:'6',chhe:'6',saat:'7',aath:'8',nau:'9','शून्य':'0','एक':'1','दो':'2','तीन':'3','चार':'4','पांच':'5','छह':'6','सात':'7','आठ':'8','नौ':'9'};
+      return text.replace(/[A-Za-z\u0900-\u097F]+/g, function(w){ return Object.prototype.hasOwnProperty.call(map, w.toLowerCase()) ? map[w.toLowerCase()] : w; });
+    }
+
+    function normalizeVoiceAliases_(text){
+      var value = String(text||'');
+      var aliases = [
+        [/\bw\s*\.?\s*i\b|डब्ल्यू\s*आई/gi,'WI'],
+        [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
+        [/\bwash\s*(?:and\s*)?fold\b|वॉश\s*(?:एंड\s*)?फोल्ड/gi,'WF'],
+        [/\b(?:narso|narson|nurso)\b|नरसों|नरसो/gi,'narso'],
+        [/\b(?:parso|parson|barso|farso)\b|परसों|परसो/gi,'parso'],
+        // Map spoken washing + ironing instructions to the WI service code.
+        [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?(?:iron(?:ing)?|press(?:ing)?)\b|\bwashiron\b/gi,'WI'],
+        [/\b(?:dho\s*(?:ke|kar)|dhoke|dhokar)\s*(?:(?:phir|fir)\s*)?(?:press|pres|iron|istri|istree)(?:\s+(?:karna|karo|kar\s*do|kar\s*dena))?\b/gi,'WI'],
+        [/धो\s*(?:के|कर)\s*(?:(?:फिर)\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
+        [/(?:वॉश|वाश|वास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
+        [/\b(?:d\s*c|dry\s*clean(?:ing)?)\b|डी\s*सी|ड्राई\s*क्लीन(?:िंग)?/gi,'DC'],
+        [/\b(?:k\s*g|kgs?|kilo(?:gram)?)\b|के\s*जी|किलो(?:ग्राम)?/gi,'kg'],
+        [/\b(?:sart|shart|shert)\b|सर्ट|शर्ट/gi,'shirt'],
+        [/\b(?:paint|pent|paant)\b|पेंट|पैंट/gi,'pant'],
+        [/\b(?:jin|jins|jean)\b|जीन्स|जींस|जीन/gi,'jeans'],
+        [/\b(?:blezer|blazer)\b|ब्लेजर/gi,'blazer'],
+        [/\b(?:blankit|blanket)\b|ब्लैंकेट|कंबल/gi,'blanket'],
+        [/\b(?:rupya|rupye|rupaye|rupees?)\b|रुपया|रुपये/gi,'rupees'],
+        [/\b(?:ret|rait)\b|रेट/gi,'rate'],
+        [/\b(?:fon|fone)\b|फ़ोन|फोन/gi,'phone'],
+        [/\b(?:mobail|mobyle)\b|मोबाइल/gi,'mobile']
+      ];
+      aliases.forEach(function(pair){ value = value.replace(pair[0], pair[1]); });
+      return value.replace(/\s+/g,' ').trim();
+    }
+
+    function voiceDateToIso_(text){
+      var t = normalizeVoiceDigits_(normalizeVoiceAliases_(text)).toLowerCase();
+      var d = new Date();
+      if(/narso/.test(t)) d.setDate(d.getDate()+3);
+      else if(/day after tomorrow|parso|परसों/.test(t)) d.setDate(d.getDate()+2);
+      else if(/tomorrow|कल/.test(t)) d.setDate(d.getDate()+1);
+      else {
+        var m = t.match(/(?:delivery|date|डिलीवरी|तारीख)\s*(?:date|की तारीख)?\s*(\d{1,2})[\s\/\-.]+(\d{1,2})(?:[\s\/\-.]+(\d{2,4}))?/i);
+        if(m){
+          var year = Number(m[3]||d.getFullYear());
+          if(year < 100) year += 2000;
+          d = new Date(year, Number(m[2])-1, Number(m[1]));
+        }
+      }
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+
+    function resolveVoiceService_(spoken, isKg){
+      var cleaned = normalizeVoiceAliases_(spoken).toLowerCase().replace(/\b(ki|ka|ke|me|mein|service|hai|hain)\b|की|का|के|में|सर्विस|हैं|है/g,' ').replace(/\s+/g,' ').trim();
+      var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold)$/.test(cleaned) ? 'WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
+      return serviceOptions.find(function(opt){
+        var o = String(opt).trim().toUpperCase();
+        return o === code || (code === 'WI' && /WASH.*IRON/.test(o)) || (code === 'WF' && /WASH.*FOLD/.test(o)) || (code === 'DC' && /DRY.*CLEAN/.test(o));
+      }) || '';
+    }
+
+    function normalizeVoiceItem_(spoken){
+      // Normalize only the item field, never customer names or remarks.
+      var original = String(spoken||'').trim();
+      var text = original.toLowerCase().replace(/[-–/]/g,' ').replace(/\s+/g,' ').trim();
+      var words = [
+        ['टी शर्ट|टीशर्ट|t shirt|tshirts|tshirt','tshirt'],
+        ['कमीज़|कमीज|शर्ट|shirts|shirt','shirt'],
+        ['पतलून|ट्राउजर|ट्राउज़र्स|trousers|trouser|पतलूनों|pant|pants','trouser'],
+        ['जींस|जीन्स|jeans','jeans'],
+        ['कोट|coats','coat'],['पूरा|पूरी|फुल|poora|pura','full'],['आधा|आधी|हाफ|aadha|adha','half'],
+        ['सूट|suits','suit'],['पीस|पीसेस|टुकड़े|pieces|piece|pcs','pcs'],
+        ['जैकेट|जाकेट|jackets','jacket'],['चमड़े|चमड़ा|चमड़े|लेदर|chamde|chamda','leather'],
+        ['नॉर्मल|नार्मल|सामान्य','normal'],['स्वेटर|sweaters','sweater'],['कार्डिगन|कार्डीगन|cardigans','cardigan'],
+        ['कुर्ता|कुर्ते|कुर्ती|कुर्तियां|kurte|kurtas|kurti|kurtis','kurta'],
+        ['सादा|साधारण|सादी|प्लेन|saada|sada|saadi','plain'],
+        ['फैंसी|फेन्सी|कढ़ाई|कढ़ाई|कढ़ाईदार|kadhai|kadhaai','fancy'],
+        ['रेशमी|रेशम|सिल्क|reshmi|resham','silk'],
+        ['सलवार|शलवार|salwars|shalwar','salwar'],
+        ['साड़ी|साडी|साड़ियां|साडियां|साड़ियाँ|साडियाँ|sarees|saris|sari|saari|sadi','saree'],
+        ['सूती|कॉटन|काटन|suti|sooti','cotton'],['वर्क|काम|kaam','work'],
+        ['ड्रेस|dresses','dress'],['छोटी|छोटा|शॉर्ट|chhoti|choti|short','short'],
+        ['घुटने|घुटनों|घुटना|ghutne','knee'],['तक|लंबाई|length','length'],
+        ['मैक्सी|maxi','maxi'],['लंबी|लम्बी|लॉन्ग|lambi','long'],['नाजुक|नाज़ुक|delicate|nazuk','delicate'],
+        ['लहंगा|लहँगा|लहंगे|लहंगे|lehnga|lehangas|lehengas|lehanga','lehenga'],
+        ['अस्तर|लाइनिंग|परत|astar|lining|linings|layer|layers','lining'],
+        ['सिंगल|एकल|single','single'],['डबल|दोहरा|दोहरी|double','double'],
+        ['शॉल|शाल|shawls|shaal|shal','shawl'],
+        ['कंबल|कम्बल|blankets|kambal|blanket','blanket'],['भारी|हेवी|bhaari|bhari','heavy'],
+        ['तौलिया|तौलिये|टॉवल|तोलिया|tauliya|toliya|towels','towel'],
+        ['बड़ा|बड़ी|बड़े|बडा|बडी|बडे|लार्ज|bada|badi|bade','large'],
+        ['हाथ|हैंड|haath','hand'],['मुंह|मुँह|चेहरा|फेस|chehra|muh','face'],
+        ['बेडशीट|बेड शीट|चादर|चादरें|चादरे|chadar|chaadar|bed sheet|bedsheets','bedsheet'],
+        ['रजाई|रज़ाई|rajai|rajaai|quilts','quilt'],
+        ['कालीन|कारपेट|क़ालीन|kaleen|kalin|carpets','carpet'],
+        ['वर्ग फुट|स्क्वायर फीट|स्क्वेयर फीट|square feet|square foot|sq ft|sqft','sqft'],
+        ['पर्दा|पर्दे|परदे|पर्दों|curtain|curtains|parde|parda|pardein','curtains'],
+        ['सोफा|सोफ़ा','sofa'],['कवर|covers','cover'],['मध्यम|मीडियम|medium','medium'],
+        ['छोटे|स्मॉल|chhota|chota|small','small'],
+        ['स्पोर्ट्स|खेल|sports','sports'],['कैनवास|canvas','canvas'],['स्वेड|सुएड|suede','suede'],
+        ['जूते|जूता|जुते|शू|शूज़|shoes|joota|joote|jute','shoe']
+      ];
+      words.forEach(function(pair){
+        text = text.replace(new RegExp('(^|\\s)(?:'+pair[0]+')(?=\\s|$)','gi'),function(_,prefix){return prefix+pair[1];});
+      });
+      text=text.replace(/\b(?:ka|ki|ke|wala|wali|wale)\b|(?:का|की|के|वाला|वाली|वाले)/g,' ').replace(/\s+/g,' ').trim();
+      function has(word){return (' '+text+' ').indexOf(' '+word+' ')>=0;}
+      if(has('shirt')||has('tshirt')) return 'Shirt/Tshirt';
+      if(has('trouser')||has('jeans')) return 'Trouser/Jeans';
+      if(has('coat')) return has('half')?'Half-Coat':has('full')?'Full-Coat':'Coat';
+      if(has('suit')) return has('3')&&has('pcs')?'Suit 3 Pcs':has('2')&&has('pcs')?'Suit 2 Pcs':'Suit';
+      if(has('jacket')) return has('leather')?'Jacket-Leather':has('normal')?'Jacket-Normal':'Jacket';
+      if(has('sweater')||has('cardigan')) return 'Sweater/Cardigan';
+      if(has('kurta')) return has('silk')||has('fancy')?'Kurta-Fancy/ Silk':has('plain')?'Kurta-Plain':'Kurta';
+      if(has('salwar')) return has('fancy')?'Salwar-Fancy':has('plain')?'Salwar-Plain':'Salwar';
+      if(has('saree')) return has('silk')&&has('work')?'Saree-Silk Work':has('silk')?'Saree-Silk':has('cotton')?'Saree-Cotton':has('plain')?'Saree-Plain':'Saree';
+      if(has('dress')||has('maxi')) return has('short')||has('knee')?'Short Dress Knee Length':(has('maxi')||has('long'))&&has('delicate')?'Maxi/Long Dress -Delicate':has('maxi')||has('long')?'Maxi/Long Dress':'Dress';
+      if(has('lehenga')) return has('lining')?(has('3')?'Lehenga-3 Lining':has('2')?'Lehenga-2 Lining':has('1')||has('single')?'Lehenga-Single Lining':'Lehenga-Lining'):'Lehenga';
+      if(has('shawl')) return 'Shawl';
+      if(has('blanket')) return 'Blanket'+(has('heavy')?' Heavy':'')+(has('double')?'-Double':has('single')?'-Single':'');
+      if(has('towel')) return has('hand')||has('face')?'Hand / Face Towel':has('large')?'Towel Large':'Towel';
+      if(has('bedsheet')) return has('double')?'Bedsheet-Double':has('single')?'Bedsheet-Single':'Bedsheet';
+      if(has('quilt')) return has('double')?'Quilt-Double':has('single')?'Quilt-Single':'Quilt';
+      if(has('carpet')) return has('150')&&has('200')?'Carpet 150-200 Sq ft':has('25')?'Carpet upto 25 Sq Ft':'Carpet';
+      if(has('curtains')) return has('cotton')?'Curtains Cotton':'Curtains';
+      if(has('sofa')&&has('cover')) return 'Sofa cover'+(has('large')?' – Large':has('medium')?' – Medium':has('small')||has('short')?' – Small':'');
+      if(has('shoe')||/^(sports|canvas|leather|suede)$/.test(text)) return has('suede')?'Suede Shoe':has('leather')?'Leather Shoe':has('canvas')?'Canvas Shoe':has('sports')?'Sports Shoe':'Shoe';
+      return original; // Keep unknown garments editable; never guess a priced variant.
+    }
+
+    function parseNaturalVoiceItems_(text){
+      // A service ends each Quantity–Item–Service row, even without commas.
+      var alternatives = ['WI','WF','DC','KG','wash iron','wash & iron','wash fold','dry clean','dry cleaning'].concat(serviceOptions);
+      alternatives = alternatives.filter(Boolean).sort(function(a,b){ return b.length-a.length; }).map(function(x){ return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); });
+      var pattern = new RegExp('(?:^|[\\s,;।])(?:quantity\\s+|qty\\s+|मात्रा\\s+)?(\\d+(?:\\.\\d+)?)\\s+(?:item\\s+|आइटम\\s+)?([^,;।]+?)\\s+(?:service\\s+|सेवा\\s+)?('+alternatives.join('|')+')(?=$|[\\s,;।.])(?:\\s+(?:weight|वजन)\\s+(\\d+(?:\\.\\d+)?))?', 'gi');
+      var rows = [], m;
+      while((m = pattern.exec(text)) !== null){
+        var item = m[2].replace(/\s+(?:hai|hain|ki|ka|ke|है|हैं|की|का|के)\s*$/i,'').trim();
+        if(!item || Number(m[1])<=0) continue;
+        var service = resolveVoiceService_(m[3], /^kg$/i.test(m[3]));
+        rows.push({service:service,item:normalizeVoiceItem_(item),qty:Number(m[1]),weight:Number(m[4])||0,rate:0,amt:0});
+      }
+      return rows;
+    }
+
+    function parseVoiceToken_(speech){
+      var text = normalizeVoiceDigits_(normalizeVoiceAliases_(speech)).replace(/\s+/g,' ').trim();
+      var lower = text.toLowerCase();
+      var phoneMatch = text.match(/(?:phone|mobile|number|फोन|मोबाइल|नंबर)\s*[:\-]?\s*((?:\d[\s-]*){10})/i) || text.match(/((?:\d[\s-]*){10})/);
+      var phone = phoneMatch ? phoneMatch[1].replace(/\D/g,'').slice(-10) : '';
+      var nameMatch = text.match(/(?:name|naam|नाम)\s*[:\-]?\s*(.+?)(?=\s+(?:phone|mobile|number|फोन|मोबाइल|नंबर|delivery|डिलीवरी|service|सेवा|item|आइटम|remark|रिमार्क|$))/i);
+      var name = nameMatch ? nameMatch[1].trim() : '';
+      if(!name && phoneMatch && typeof phoneMatch.index === 'number') {
+        name = text.slice(0, phoneMatch.index).replace(/^[,.;\s]+|[,.;\s]+$/g,'').replace(/^(customer|ग्राहक)\s+/i,'').replace(/(?:phone|mobile|फोन|मोबाइल)\s*$/i,'').trim();
+      }
+      var remarkMatch = text.match(/(?:remark|remarks|note|रिमार्क|टिप्पणी)\s*[:\-]?\s*(.+)$/i);
+      // Exclude phone, date and remarks so their numbers cannot become garments.
+      var itemText = remarkMatch ? text.slice(0, remarkMatch.index) : text;
+      itemText = itemText.replace(/(?:phone|mobile|number|फोन|मोबाइल|नंबर)\s*[:\-]?\s*(?:\d[\s-]*){10}/gi,' ');
+      itemText = itemText.replace(/(?:delivery|date|डिलीवरी|तारीख)\s*(?:date|की तारीख)?\s*\d{1,2}[\s\/\-.]+\d{1,2}(?:[\s\/\-.]+\d{2,4})?/gi,' ');
+      var items = parseNaturalVoiceItems_(itemText);
+      if(!items.length){
+        // Also accept the older labeled format; any spoken rate is ignored.
+        var pattern = /(?:service|सेवा)\s+(.+?)\s+(?:item|आइटम)\s+(.+?)\s+(?:(?:rate|रेट)\s+\d+(?:\.\d+)?\s+)?(?:quantity|qty|मात्रा|क्वांटिटी)\s+(\d+(?:\.\d+)?)(?:\s+(?:weight|वजन)\s+(\d+(?:\.\d+)?))?/gi;
+        var m;
+        while((m=pattern.exec(itemText)) !== null){
+          items.push({service:resolveVoiceService_(m[1],/^kg$/i.test(m[1])),item:normalizeVoiceItem_(m[2]),qty:Number(m[3]),weight:Number(m[4])||0,rate:0,amt:0});
+        }
+      }
+      return {name:name, phone:phone, deliveryDate:voiceDateToIso_(lower), remark:remarkMatch?remarkMatch[1].trim():'', items:items};
+    }
+
+    function fillVoiceTokenForm_(data){
+      if(data.name) document.getElementById('tokenCustomerName').value = capitalizeWords(data.name);
+      if(data.phone) document.getElementById('tokenPhone').value = data.phone;
+      if(data.deliveryDate) document.getElementById('tokenDeliveryDate').value = data.deliveryDate;
+      if(data.remark) document.getElementById('tokenRemark').value = data.remark;
+      if(data.items && data.items.length) renderTokenItemsTable(data.items);
+      else {
+        document.getElementById('voiceTokenStatus').textContent = 'No items understood. Say: 2 shirt WI, 3 pant WF. Check the table before saving.';
+        document.getElementById('voiceTokenBtn').disabled = false;
+        document.getElementById('voiceTokenStopBtn').disabled = true;
+      }
+      calcTokenTotals();
+    }
+
+    function confirmVoiceToken_(transcript){
+      var name = document.getElementById('tokenCustomerName').value.trim();
+      var phone = document.getElementById('tokenPhone').value.trim();
+      var items = getTokenItems();
+      if(!name || !/^\d{10}$/.test(phone) || !items.length || items.some(function(it){ return !it.item||!it.service||it.qty<=0; })){
+        document.getElementById('voiceTokenStatus').textContent = 'Some details were not understood. Correct the form or speak again.';
+        document.getElementById('voiceTokenBtn').disabled = false;
+        return;
+      }
+      var summary = 'Token for ' + name + ', phone ' + phone.split('').join(' ') + ', total quantity ' + document.getElementById('tokenQuantity').value + '. Save karoon? Haan ya nahin boliye.';
+      document.getElementById('voiceTokenStatus').textContent = 'Confirming: say Yes/Haan or No/Nahi.';
+      
+      if(window.speechSynthesis) {
+        var utterance = new SpeechSynthesisUtterance(summary);
+        utterance.lang = 'hi-IN';
+        utterance.rate = 0.9;
+        utterance.onend = function(){
+          setTimeout(listenVoiceTokenConfirmation_, 400);
+        };
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      } else {
+        listenVoiceTokenConfirmation_();
+      }
+    }
+
+    function listenVoiceTokenConfirmation_(){
+      if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')){
+        document.getElementById('voiceTokenStatus').textContent = 'Android is listening for Haan/Yes or Nahi/No...';
+        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('confirmation'); else window.onAndroidVoiceError('This Android app needs native voice support.');
+        return;
+      }
+      if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function'){
+        document.getElementById('voiceTokenStatus').textContent = 'Android is listening for Haan/Yes or Nahi/No...';
+        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('confirmation'); else window.onAndroidVoiceError('This Android app needs native voice support.');
+        return;
+      }
+      document.getElementById('voiceTokenStatus').textContent = 'Voice confirmation is available only in the Android app.';
+      document.getElementById('voiceTokenBtn').disabled = false;
+      document.getElementById('voiceTokenStopBtn').disabled = true;
+      return;
+      var Recognition = voiceRecognitionClass_();
+      if(!Recognition) return;
+      var recognition = new Recognition();
+      voiceTokenConfirmRecognition = recognition;
+      recognition.lang = 'hi-IN';
+      recognition.interimResults = false;
+      recognition.onresult = function(event){
+        var answer = String(event.results[0][0].transcript||'').toLowerCase();
+        handleVoiceTokenConfirmation_(answer);
+      };
+      recognition.onerror = function(){
+        document.getElementById('voiceTokenStatus').textContent = 'Confirmation not heard. Tap Start Voice Token to retry.';
+        document.getElementById('voiceTokenBtn').disabled = false;
+      };
+      recognition.onend = function(){ voiceTokenConfirmRecognition = null; };
+      try{ recognition.start(); } catch(e){ document.getElementById('voiceTokenStatus').textContent = 'Unable to listen for confirmation.'; }
+    }
+
+    function handleVoiceTokenConfirmation_(answer){
+      answer = String(answer||'').toLowerCase();
+      document.getElementById('voiceTokenTranscript').textContent += '\nConfirmation: ' + answer;
+      if(/yes|yeah|haan|han|ha|हाँ|हां|save|सेव|करो/.test(answer)){
+        document.getElementById('voiceTokenStatus').textContent = 'Confirmed. Saving token...';
+        saveTokenBooking();
+      } else {
+        document.getElementById('voiceTokenStatus').textContent = 'Not saved. Correct the form and try again.';
+        document.getElementById('voiceTokenBtn').disabled = false;
+        document.getElementById('voiceTokenStopBtn').disabled = true;
+      }
+    }
+
+    window.onAndroidVoiceResult = function(text, mode){
+      text = String(text||'').trim();
+      if(mode === 'confirmation'){
+        handleVoiceTokenConfirmation_(text);
+        return;
+      }
+      document.getElementById('voiceTokenTranscript').textContent = text;
+      var parsed = parseVoiceToken_(text);
+      fillVoiceTokenForm_(parsed);
+      if(parsed.items.length) confirmVoiceToken_(text);
+    };
+
+    window.onAndroidVoiceError = function(message){
+      document.getElementById('voiceTokenStatus').textContent = String(message||'Android voice recognition failed.');
+      document.getElementById('voiceTokenBtn').disabled = false;
+      document.getElementById('voiceTokenStopBtn').disabled = true;
+    };
+
+    window.addEventListener('message', function(event){
+      var data = event.data||{};
+      if(data.type === 'LB_NATIVE_VOICE_RESULT') window.onAndroidVoiceResult(data.text, data.mode);
+      if(data.type === 'LB_NATIVE_VOICE_ERROR') window.onAndroidVoiceError(data.message);
+      if(data.type === 'LB_NATIVE_VOICE_STATUS') {
+        document.getElementById('voiceTokenStatus').textContent = String(data.message||'Listening...');
+      }
+    });
+
+    function openTokenOrder(tokenNumber){
+      if(!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')){
+        alert('Only an authorised order user can create an order from a token.');
+        return;
+      }
+      const activeToken = getActiveSessionToken();
+      if(!activeToken){
+        alert('Please login first.');
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function(tok){
+          sourceTokenNumber = tok.tokenNumber;
+          addNewOrder(function(){
+            document.getElementById('phone').value = tok.phone || '';
+            document.getElementById('customerName').value = tok.customerName || '';
+            document.getElementById('deliveryDate').value = tok.deliveryDate || document.getElementById('orderDate').value;
+            if(Array.isArray(tok.items) && tok.items.length) renderItemsTable(tok.items.map(function(it){ return {service:it.service,item:it.item,qty:it.qty,weight:it.weight,rate:'',amt:0}; }));
+            var tokenContinuation = 'Token Number: ' + (tok.tokenNumber || '') +
+              ' | Total Quantity: ' + (tok.quantity || 0) +
+              ' | Remark: ' + (tok.remark || '—');
+            document.getElementById('customerInfo').textContent = tokenContinuation;
+            document.getElementById('customerInfo').className = 'info';
+            showTab('orderBooking');
+          });
+        })
+        .withFailureHandler(function(e){ alert('Unable to open token for order: ' + (e.message||e)); })
+        .getTokenForOrder(tokenNumber, activeToken);
+    }
+
+    function loadTokens(){
+      var tokenList = document.getElementById('tokenList');
+      var activeToken = getActiveSessionToken();
+      if(!tokenList) return;
+      if(!activeToken){
+        tokenList.innerHTML = '<div class="error">Please log in to load token details.</div>';
+        return;
+      }
+      tokenList.innerHTML = '<div class="info">Loading token details...</div>';
+      google.script.run
+        .withSuccessHandler(function(rows){
+          rows = Array.isArray(rows) ? rows : [];
+          rows.sort(function(a,b){
+            var aNumber = Number(String(a.tokenNumber||'').replace(/\D/g,''));
+            var bNumber = Number(String(b.tokenNumber||'').replace(/\D/g,''));
+            return bNumber - aNumber;
+          });
+          var canOrder = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+          var h = '<div class="token-card-list">';
+          rows.forEach(function(r){
+            if(r.orderNumber){
+              h += '<div class="token-card booked">'+
+                '<div class="token-card-row"><span class="token-card-label">Token No.</span><span class="token-card-value">'+escapeHtml(String(r.tokenNumber||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Date</span><span class="token-card-value">'+escapeHtml(formatTokenDate(r.tokenDate))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Customer</span><span class="token-card-value">'+escapeHtml(String(r.customerName||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Phone</span><span class="token-card-value">'+escapeHtml(String(r.phone||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Quantity</span><span class="token-card-value">'+escapeHtml(String(r.quantity||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Remark</span><span class="token-card-value">'+escapeHtml(String(r.remark||'—'))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Order No.</span><span class="token-card-value success">'+escapeHtml(String(r.orderNumber))+'</span></div>'+
+                '</div>';
+            } else {
+              var button = canOrder
+                ? '<button class="btn" onclick="openTokenOrder(\''+String(r.tokenNumber).replace(/'/g,"\\'")+'\')">Book Order</button>'
+                : '<button class="btn" type="button" disabled title="Only Admin or Manager can book an order">Book Order</button>';
+              h += '<div class="token-card">'+
+                '<div class="token-card-row"><span class="token-card-label">Token No.</span><span class="token-card-value">'+escapeHtml(String(r.tokenNumber||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Date</span><span class="token-card-value">'+escapeHtml(formatTokenDate(r.tokenDate))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Customer</span><span class="token-card-value">'+escapeHtml(String(r.customerName||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Phone</span><span class="token-card-value">'+escapeHtml(String(r.phone||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Quantity</span><span class="token-card-value">'+escapeHtml(String(r.quantity||''))+'</span></div>'+
+                '<div class="token-card-row"><span class="token-card-label">Remark</span><span class="token-card-value">'+escapeHtml(String(r.remark||'—'))+'</span></div>'+
+                '<div class="token-card-action">'+button+'</div>'+
+                '</div>';
+            }
+          });
+          if(!rows.length) h += '<div class="info">No token records found.</div>';
+          h += '</div>';
+          tokenList.innerHTML = h;
+        })
+        .withFailureHandler(function(e){
+          tokenList.innerHTML = '<div class="error">Unable to load tokens: '+escapeHtml(String((e&&e.message)||e||'Unknown error'))+'</div>';
+        })
+        .getTokens(activeToken);
+    }
+
+    function formatTokenDate(v){
+      if(!v) return '';
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('en-IN');
+    }
+
+    function escapeHtml(v){
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    function loadTelegramSettings(){ 
+      google.script.run.withSuccessHandler(function(s){
+        document.getElementById('telegramBotToken').value = s.botToken||'';
+        document.getElementById('telegramChatId').value = s.chatId||'';
+      }).getTelegramSettings(getActiveSessionToken()); 
+    }
+    
+    function saveTelegram(){ 
+      google.script.run.withSuccessHandler(function(m){
+        document.getElementById('telegramResult').textContent = m;
+      }).saveTelegramSettings(document.getElementById('telegramBotToken').value, document.getElementById('telegramChatId').value, getActiveSessionToken()); 
+    }
+    
+    function testTelegramBot(){ 
+      google.script.run.withSuccessHandler(function(m){
+        document.getElementById('telegramResult').textContent = 'Test sent: ' + m;
+      }).withFailureHandler(function(e){
+        document.getElementById('telegramResult').textContent = 'Error: ' + e;
+      }).testTelegram(document.getElementById('telegramBotToken').value, document.getElementById('telegramChatId').value, getActiveSessionToken()); 
+    }
+
+    function setLogo(base64img) {
+      if (base64img) document.getElementById('portalLogo').src = 'data:image/png;base64,' + base64img;
+    }
+
+    function setServices(opts) {
+      serviceOptions = Array.isArray(opts) ? opts.slice() : [];
+      if(!serviceOptions.some(function(s){ return String(s).trim().toUpperCase()==='KG'; })) serviceOptions.push('KG');
+      renderItemsTable([]);
+      renderTokenItemsTable([]);
+    }
+
+    function lookupCustomer() {
+      const phoneInput = document.getElementById('phone');
+      const phone = phoneInput.value.trim();
+      const customerInfo = document.getElementById('customerInfo');
+      const loading = document.getElementById('phoneLoading');
+      
+      if (lookupTimeout) clearTimeout(lookupTimeout);
+      
+      if (phone.length < 10) {
+        customerInfo.textContent = '';
+        loading.style.display = 'none';
+        return;
+      }
+      
+      loading.style.display = 'inline-block';
+      customerInfo.textContent = 'Searching...';
+      customerInfo.className = 'info';
+      
+      lookupTimeout = setTimeout(function() {
+        if (phone.length === 10 && /^\d{10}$/.test(phone)) {
+          google.script.run
+            .withSuccessHandler(function(customerName) {
+              loading.style.display = 'none';
+              if (customerName && customerName.trim() !== '') {
+                document.getElementById('customerName').value = customerName;
+                customerInfo.textContent = `Customer found: ${customerName}`;
+                customerInfo.className = 'success';
+              } else {
+                document.getElementById('customerName').value = '';
+                customerInfo.textContent = 'New customer - please enter name';
+                customerInfo.className = 'info';
+              }
+            })
+            .withFailureHandler(function(error) {
+              loading.style.display = 'none';
+              customerInfo.textContent = 'Error looking up customer';
+              customerInfo.className = 'error';
+            })
+            .getCustomerByPhone(phone, getActiveSessionToken());
+        } else {
+          loading.style.display = 'none';
+          customerInfo.textContent = 'Enter valid 10-digit phone number';
+          customerInfo.className = 'error';
+        }
+      }, 800);
+    }
+
+    function addNewOrder(prefillCallback) {
+      const activeToken = getActiveSessionToken();
+      if (!activeToken) {
+        document.getElementById('orderError').textContent = 'Please login first.';
+        document.getElementById('orderError').className = 'error';
+        return;
+      }
+      document.getElementById('saveOrderBtn').disabled = false;
+      document.getElementById('orderError').textContent = '';
+      document.getElementById('orderError').className = 'error';
+      document.getElementById('customerInfo').textContent = '';
+      document.getElementById('phoneLoading').style.display = 'none';
+      
+      google.script.run.withSuccessHandler(function(obj) {
+        document.getElementById('orderNumber').value = obj.orderNumber;
+        document.getElementById('orderDate').value = obj.today;
+        document.getElementById('customerName').value = "";
+        document.getElementById('deliveryDate').value = obj.today;
+        document.getElementById('phone').value = "";
+        renderItemsTable([]);
+        document.getElementById('totalAmount').value = "0";
+        document.getElementById('totalQuantity').value = "0";
+        document.getElementById('printInvoiceBtn').style.display = "none";
+        document.getElementById('printTagBtn').style.display = "none";
+        document.getElementById('remoteInvoiceBtn').style.display = "none";
+        document.getElementById('remoteTagBtn').style.display = "none";
+        document.getElementById('whatsappInvoiceBtn').style.display = "none";
+        if (typeof prefillCallback === 'function') prefillCallback();
+      }).withFailureHandler(function(e){
+        document.getElementById('orderError').textContent = 'Unable to get new order number: '+(e.message||e);
+        document.getElementById('orderError').className = 'error';
+      }).getNewOrderDetails(activeToken);
+    }
+
+    function addItemRow() {
+      let items = Array.from(document.querySelectorAll('.itemRow')).map(function(row){
+        return {
+          service: row.querySelector('.service').value,
+          item: row.querySelector('.item').value,
+          rate: row.querySelector('.rate').value,
+          qty: row.querySelector('.qty').value,
+          weight: row.querySelector('.weight').value,
+          amt: row.querySelector('.amt').value
+        };
+      });
+      items.push({service: "", item: "", rate: "", qty: "", weight: "", amt: ""});
+      renderItemsTable(items);
+    }
+
+    function renderItemsTable(items) {
+      let html = `<table><thead><tr>
+        <th>Service</th><th>Item</th><th>Rate</th><th>Qty</th><th>Amount</th><th></th></tr></thead><tbody>`;
+      for (let i = 0; i < items.length; i++) {
+        html += `<tr class="itemRow">
+          <td><select class="service" onchange="handleServiceChange(this)">${serviceOptions.map(function(opt){ return `<option ${items[i].service===opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`; }).join('')}</select></td>
+          <td><div class="item-input-stack">
+            <input class="item" type="text" value="${escapeHtml(items[i].item || '')}" autocomplete="off" oninput="capitalizeInput(this)">
+            <input class="weight" type="number" value="${escapeHtml(items[i].weight || '')}" min="0" step="0.01" placeholder="Weight" aria-label="Weight" oninput="calcAmtRow(this)">
+          </div></td>
+          <td><input class="rate" type="number" value="${items[i].rate === '' || items[i].rate == null ? '' : Math.round(Number(items[i].rate) || 0)}" min="0" step="1" oninput="calcAmtRow(this)"></td>
+          <td><input class="qty" type="number" value="${items[i].qty || 0}" min="0" oninput="calcAmtRow(this)"></td>
+          <td><input class="amt" type="number" value="${Math.round(Number(items[i].amt) || 0)}" readonly></td>
+          <td>${items.length > 1 ? `<button class="btn remove-item-btn" type="button" title="Remove item" aria-label="Remove item" onclick="removeItemRow(${i})">&times;</button>` : ''}</td>
+        </tr>`;
+      }
+      html += `</tbody></table>`;
+      document.getElementById('itemsTable').innerHTML = html;
+      document.querySelectorAll('#itemsTable .service').forEach(function(select){
+        let row = select.closest('tr');
+        let isKg = select.value.trim().toUpperCase()==='KG';
+        row.querySelector('.qty').disabled = false;
+        let weight = row.querySelector('.weight');
+        weight.disabled = !isKg;
+        weight.style.display = isKg ? 'block' : 'none';
+      });
+      calcTotal();
+    }
+
+    function calcAmtRow(el) {
+      let row = el.closest('tr');
+      let rate = +row.querySelector('.rate').value || 0;
+      let qty = +row.querySelector('.qty').value || 0;
+      let weight = +row.querySelector('.weight').value || 0;
+      let isKg = row.querySelector('.service').value.trim().toUpperCase() === 'KG';
+      row.querySelector('.amt').value = Math.round(rate * (isKg ? weight : qty));
+      calcTotal();
+    }
+
+    function handleServiceChange(select) {
+      let row = select.closest('tr');
+      let isKg = select.value.trim().toUpperCase()==='KG';
+      let qty = row.querySelector('.qty');
+      let weight = row.querySelector('.weight');
+      qty.disabled = false;
+      weight.disabled = !isKg;
+      weight.style.display = isKg ? 'block' : 'none';
+      if(!isKg) weight.value = '';
+      calcAmtRow(select);
+    }
+
+    function removeItemRow(idx) {
+      let rows = Array.from(document.querySelectorAll('.itemRow'));
+      rows.splice(idx, 1);
+      let arr = rows.map(function(row){
+        return {
+          service: row.querySelector('.service').value,
+          item: row.querySelector('.item').value,
+          rate: row.querySelector('.rate').value,
+          qty: row.querySelector('.qty').value,
+          weight: row.querySelector('.weight').value,
+          amt: row.querySelector('.amt').value
+        };
+      });
+      renderItemsTable(arr);
+    }
+
+    function calcTotal() {
+      let items = document.querySelectorAll('.itemRow');
+      let sumAmt = 0, sumQty = 0;
+      items.forEach(function(row){
+        sumAmt += Number(row.querySelector('.amt').value) || 0;
+        sumQty += Number(row.querySelector('.qty').value) || 0;
+      });
+      document.getElementById('totalAmount').value = Math.round(sumAmt);
+      document.getElementById('totalQuantity').value = sumQty;
+    }
+
+    function saveOrder() {
+      let order = {
+        orderNumber: document.getElementById('orderNumber').value,
+        orderDate: document.getElementById('orderDate').value,
+        customerName: document.getElementById('customerName').value.trim(),
+        deliveryDate: document.getElementById('deliveryDate').value,
+        phone: document.getElementById('phone').value.trim(),
+        totalAmount: document.getElementById('totalAmount').value,
+        items: [],
+        sourceTokenNumber: sourceTokenNumber || ''
+      };
+      let rows = document.querySelectorAll('.itemRow');
+      rows.forEach(function(row){
+        order.items.push({
+          service: row.querySelector('.service').value,
+          item: row.querySelector('.item').value.trim(),
+          rate: row.querySelector('.rate').value,
+          qty: row.querySelector('.qty').value,
+          weight: row.querySelector('.weight').value,
+          amt: row.querySelector('.amt').value
+        });
+      });
+      let error = "";
+      if (!/^\d{10}$/.test(order.phone)) error = "Phone must be exactly 10 digits.";
+      else if (new Date(order.deliveryDate) < new Date(order.orderDate)) error = "Delivery date cannot be before order date.";
+      else if (!order.customerName) error = "Customer Name required.";
+      else if (order.items.length === 0 || order.items.every(function(i){ return !i.service && !i.item; })) error = "At least one item is required.";
+      else if (order.items.some(function(i){ return String(i.service).toUpperCase()==='KG' && !(Number(i.weight)>0); })) error = "Weight is required for KG service.";
+      if (!error && order.items.some(function(i){ return String(i.rate).trim()==='' || !Number.isFinite(Number(i.rate)) || Number(i.rate)<0; })) error = "Enter a valid rate for every item in Book Order.";
+      if (error) {
+        document.getElementById('orderError').textContent = error;
+        document.getElementById('orderError').className = 'error';
+        return;
+      }
+      document.getElementById('orderError').textContent = "";
+      document.getElementById('saveOrderBtn').disabled = true;
+      google.script.run.withSuccessHandler(function(){
+        document.getElementById('printInvoiceBtn').style.display = "inline-block";
+        document.getElementById('printTagBtn').style.display = "inline-block";
+        document.getElementById('remoteInvoiceBtn').style.display = "inline-block";
+        document.getElementById('remoteTagBtn').style.display = "inline-block";
+        document.getElementById('whatsappInvoiceBtn').style.display = "inline-block";
+        document.getElementById('orderError').textContent = "Order Saved!";
+        document.getElementById('orderError').className = 'success';
+        if (sourceTokenNumber) {
+          sourceTokenNumber = '';
+          if (currentUser && (currentUser.role==='admin' || currentUser.role==='manager')) loadTokens();
+        }
+      }).withFailureHandler(function(err){
+        document.getElementById('orderError').textContent = "Error: " + err;
+        document.getElementById('orderError').className = 'error';
+        document.getElementById('saveOrderBtn').disabled = false;
+      }).saveOrder(order, getActiveSessionToken());
+    }
+
+    function prepareAndroidPrintWindow(title) {
+      var win = null;
+      try {
+        win = window.open('', '_blank');
+        if(win && win.document){
+          win.document.open();
+          win.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title></head><body style="font-family:Arial,sans-serif;padding:16px;">Preparing '+title+'...</body></html>');
+          win.document.close();
+        }
+      } catch(e) { win = null; }
+      return win;
+    }
+
+    function printHtmlOnAndroid(win, html, title) {
+      var mobileStyle = '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+        '<style>*{box-sizing:border-box}html,body{width:100%;max-width:100%;margin:0;overflow-x:hidden}'+
+        'body{padding:10px;font-family:Arial,sans-serif}img,table{max-width:100%!important}'+
+        'table{width:100%!important;table-layout:fixed;border-collapse:collapse}th,td{overflow-wrap:anywhere;word-break:break-word}'+
+        '@media print{body{padding:0}}</style>';
+      var documentHtml = String(html||'');
+      if(/<head[\s>]/i.test(documentHtml)){
+        documentHtml = documentHtml.replace(/<head([^>]*)>/i, '<head$1>'+mobileStyle);
+      } else {
+        documentHtml = '<!doctype html><html><head><title>'+title+'</title>'+mobileStyle+'</head><body>'+documentHtml+'</body></html>';
+      }
+      if(win && !win.closed && win.document){
+        win.document.open();
+        win.document.write(documentHtml);
+        win.document.close();
+        setTimeout(function(){
+          try { win.focus(); win.print(); } catch(e) {}
+        }, 700);
+        return;
+      }
+      var frame = document.createElement('iframe');
+      frame.style.position = 'fixed';
+      frame.style.left = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '1px';
+      frame.style.height = '1px';
+      frame.style.border = '0';
+      frame.style.opacity = '0';
+      document.body.appendChild(frame);
+      var doc = frame.contentWindow.document;
+      doc.open(); doc.write(documentHtml); doc.close();
+      setTimeout(function(){
+        try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch(e) {
+          alert('Android print service is unavailable. Enable a print service or Save as PDF in Android settings.');
+        }
+        setTimeout(function(){ if(frame.parentNode) frame.parentNode.removeChild(frame); }, 1500);
+      }, 700);
+    }
+
+    function isAndroidDevice(){
+      return /Android/i.test(navigator.userAgent||'');
+    }
+
+    function showAndroidAction(title, message, url, buttonText){
+      var old = document.getElementById('androidActionOverlay');
+      if(old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'androidActionOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
+      var box = document.createElement('div');
+      box.style.cssText = 'width:100%;max-width:420px;background:#fff;border:3px solid #FFA500;border-radius:12px;padding:20px;text-align:center;';
+      var heading = document.createElement('h2'); heading.textContent = title;
+      var info = document.createElement('p'); info.textContent = message;
+      var action = document.createElement('a');
+      action.className = 'btn'; action.textContent = buttonText; action.href = url;
+      action.target = '_blank'; action.rel = 'noopener external';
+      action.style.cssText = 'display:block;width:100%;margin:12px 0;padding:14px;';
+      var close = document.createElement('button');
+      close.className = 'btn'; close.type = 'button'; close.textContent = 'Close';
+      close.style.cssText = 'display:block;width:100%;background:#666;';
+      close.onclick = function(){ overlay.remove(); };
+      box.appendChild(heading); box.appendChild(info); box.appendChild(action); box.appendChild(close);
+      overlay.appendChild(box); document.body.appendChild(overlay);
+    }
+
+    function openAndroidPdf(orderNumber, type){
+      var serverFunction = type==='Tag'?'saveTagPdfAndGetLink':'saveInvoicePdfAndGetLink';
+      google.script.run
+        .withSuccessHandler(function(url){
+          if(!url || String(url).indexOf('Error')===0){
+            alert('Unable to create '+type+' PDF: '+(url||'Unknown error'));
+            return;
+          }
+          showAndroidAction(type+' Ready', 'Tap below to open the PDF in Android. Then use Print or Save as PDF.', url, 'Open '+type+' PDF');
+        })
+        .withFailureHandler(function(e){ alert('Unable to create '+type+' PDF: '+(e.message||e)); })
+        [serverFunction](orderNumber, getActiveSessionToken());
+    }
+
+    function printInvoice() {
+      const orderNumber = document.getElementById('orderNumber').value;
+      if (!orderNumber) {
+        alert("No order number available. Please save the order first.");
+        return;
+      }
+      if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Invoice'); return; }
+      const win = prepareAndroidPrintWindow('Invoice');
+      google.script.run
+        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Invoice'); })
+        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e.message||e)); })
+        .generateInvoice(orderNumber, getActiveSessionToken());
+    }
+
+    function printTag() {
+      const orderNumber = document.getElementById('orderNumber').value;
+      if (!orderNumber) {
+        alert("No order number available. Please save the order first.");
+        return;
+      }
+      if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Tag'); return; }
+      const win = prepareAndroidPrintWindow('Tag');
+      google.script.run
+        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Tag'); })
+        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate tag: '+(e.message||e)); })
+        .generateTag(orderNumber, getActiveSessionToken());
+    }
+
+    function searchOrder() {
+      const num = document.getElementById('searchOrderNumber').value.trim();
+      if (!num) return alert("Enter an order number to search.");
+      google.script.run.withSuccessHandler(showOrderDetail).getOrderDetails(num, getActiveSessionToken());
+    }
+
+    function showOrderDetail(obj) {
+      const container = document.getElementById('searchResult');
+      if (!obj) {
+        container.textContent = "Order not found.";
+        return;
+      }
+      let html = `<div class='table-holder bordered'>
+        <b>Customer:</b> ${obj.customerName} | <b>Phone:</b> ${obj.phone} | <b>Order Date:</b> ${obj.orderDate} | <b>Delivery Date:</b> ${obj.deliveryDate}<br>
+        <table><tr><th>Service</th><th>Item</th><th>Rate</th><th>Qty</th><th>Weight</th><th>Amt</th></tr>`;
+      obj.items.forEach(function(it){
+        html += `<tr><td>${it.service}</td><td>${it.item}</td><td>${it.rate}</td><td>${it.qty}</td><td>${it.weight||''}</td><td>${it.amt}</td></tr>`;
+      });
+      html += `</table>
+        <div class='form-row'>
+          <label>Actual Delivery Date:</label><input type='date' id='actDeliveryDate' value='${obj.today}'>
+        </div>
+        <div class='form-row'>
+          <label>Amount Paid:</label><input type='number' id='amountPaid' step='1' value='${Math.round(Number(obj.totalAmount)||0)}'>
+        </div>
+        <div class='form-row'>
+          <label>Payment Mode:</label>
+          <input type='hidden' id='payMode' value='Cash'>
+          <div class='payment-mode-buttons'>
+            <button type='button' class='btn payment-mode-btn active' onclick='setPaymentMode("Cash",this)'>Cash</button>
+            <button type='button' class='btn payment-mode-btn' onclick='setPaymentMode("Paytm",this)'>Paytm</button>
+          </div>
+        </div>
+        <div class='form-row'>
+          <label style='align-self: flex-start;'>Remarks:</label>
+          <textarea id='deliveryRemarks' placeholder='Enter any remarks about this delivery...' style='flex: 1; min-height: 60px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;'>${obj.remarks || ''}</textarea>
+        </div>
+        <div class='form-row'>
+          <button class='btn' onclick='saveDelivery(${obj.orderNumber})'>Save Delivery</button>
+        </div></div>`;
+      container.innerHTML = html;
+    }
+
+    function setPaymentMode(mode, button) {
+      document.getElementById('payMode').value = mode;
+      document.querySelectorAll('.payment-mode-btn').forEach(function(btn){
+        btn.classList.remove('active');
+      });
+      button.classList.add('active');
+    }
+
+    function saveDelivery(orderNumber) {
+      const actualDate = document.getElementById('actDeliveryDate').value;
+      const amtPaid = document.getElementById('amountPaid').value;
+      const mode = document.getElementById('payMode').value;
+      const remarks = document.getElementById('deliveryRemarks').value;
+      
+      google.script.run.withSuccessHandler(function(msg){
+        document.getElementById('searchResult').innerHTML = `<div class="success">${msg}</div>`;
+        loadTokens();
+      }).withFailureHandler(function(error){
+        document.getElementById('searchResult').innerHTML = `<div class="error">${error}</div>`;
+      }).saveDelivery({ 
+        orderNumber: orderNumber, 
+        actualDate: actualDate, 
+        amtPaid: amtPaid, 
+        mode: mode, 
+        remarks: remarks 
+      }, getActiveSessionToken());
+    }
+
+    function printInvoiceFromTab() {
+      const orderNumber = document.getElementById('invoiceOrderNo').value.trim();
+      if (!orderNumber) return alert("Enter order number.");
+      if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Invoice'); return; }
+      const win = prepareAndroidPrintWindow('Invoice');
+      google.script.run
+        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Invoice'); })
+        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e.message||e)); })
+        .generateInvoice(orderNumber, getActiveSessionToken());
+    }
+
+    function printTagFromTab() {
+      const orderNumber = document.getElementById('tagOrderNo').value.trim();
+      if (!orderNumber) return alert("Enter order number.");
+      if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Tag'); return; }
+      const win = prepareAndroidPrintWindow('Tag');
+      google.script.run
+        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Tag'); })
+        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate tag: '+(e.message||e)); })
+        .generateTag(orderNumber, getActiveSessionToken());
+    }
+
+    function showRemotePrintResult_(res) {
+      if (!res || !res.success) {
+        alert('Unable to queue remote print.');
+        return;
+      }
+      alert(res.printType + ' queued successfully.\nJob: ' + res.jobId +
+            '\nPrinter: ' + res.printer + '\nCopies: ' + res.copies);
+    }
+
+    function remotePrintTag_(orderNumber) {
+      if (!orderNumber) return alert('Enter an order number.');
+      google.script.run
+        .withSuccessHandler(showRemotePrintResult_)
+        .withFailureHandler(function(e){ alert('Remote tag print failed: ' + (e.message || e)); })
+        .queueRemoteTagPrint(orderNumber, getActiveSessionToken());
+    }
+
+    function remotePrintInvoice_(orderNumber) {
+      if (!orderNumber) return alert('Enter an order number.');
+      google.script.run
+        .withSuccessHandler(showRemotePrintResult_)
+        .withFailureHandler(function(e){ alert('Remote invoice print failed: ' + (e.message || e)); })
+        .queueRemoteInvoicePrint(orderNumber, getActiveSessionToken());
+    }
+
+    function remotePrintTagFromOrder() {
+      remotePrintTag_(document.getElementById('orderNumber').value.trim());
+    }
+    function remotePrintInvoiceFromOrder() {
+      remotePrintInvoice_(document.getElementById('orderNumber').value.trim());
+    }
+    function remotePrintTagFromTab() {
+      remotePrintTag_(document.getElementById('tagOrderNo').value.trim());
+    }
+    function remotePrintInvoiceFromTab() {
+      remotePrintInvoice_(document.getElementById('invoiceOrderNo').value.trim());
+    }
+
+    function checkOrderStatus() {
+      const orderNumber = document.getElementById('statusOrderNo').value.trim();
+      if (!orderNumber) return alert("Enter order number.");
+      google.script.run.withSuccessHandler(function(res){
+        if (res) document.getElementById('orderStatusResult').textContent = "Status: " + res;
+        else document.getElementById('orderStatusResult').textContent = "Order not found";
+        if (res === "Processing" || res === "TagPrinted") {
+          document.getElementById('completeOrderBtn').style.display = "inline-block";
+        } else {
+          document.getElementById('completeOrderBtn').style.display = "none";
+        }
+      }).getOrderStatus(orderNumber, getActiveSessionToken());
+    }
+
+    function markOrderCompleted() {
+      const orderNumber = document.getElementById('statusOrderNo').value.trim();
+      if (!orderNumber) return alert("No order selected.");
+      google.script.run.withSuccessHandler(function(res){
+        alert(res);
+        document.getElementById('orderStatusResult').textContent = "Status: Completed";
+        document.getElementById('completeOrderBtn').style.display = "none";
+      }).setOrderCompleted(orderNumber, getActiveSessionToken());
+    }
+
+    function generateDailyOrders() {
+      google.script.run.withSuccessHandler(function(data){
+        let html = '<table><tr><th>Delivery Date</th><th>Order No</th><th>Customer Name</th><th>Total Order Quantity</th><th>Status</th></tr>';
+        data.forEach(function(r){
+          html += `<tr><td>${r.deliveryDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.totalQty}</td><td>${r.status}</td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('dailyOrdersReport').innerHTML = html;
+      }).generateReport('daily', null, null, getActiveSessionToken());
+    }
+    
+    function generateCompletedOrders() {
+      google.script.run.withSuccessHandler(function(data){
+        let html = '<table><tr><th>Delivery Date</th><th>Order No</th><th>Customer Name</th><th>Total Order Quantity</th><th>Status</th></tr>';
+        data.forEach(function(r){
+          html += `<tr><td>${r.deliveryDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.totalQty}</td><td>${r.status}</td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('completedOrdersReport').innerHTML = html;
+      }).generateCompletedOrderReport(getActiveSessionToken());
+    }
+    
+    function printCompletedOrders() {
+      const content = document.getElementById('completedOrdersReport').innerHTML;
+      const win = window.open('', '_blank', 'width=900,height=600');
+      win.document.write('<html><head><title>Completed Order Report</title></head><body><h2>Completed Order Report</h2>' + content + '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    }
+
+    function generateDeliveryReport() {
+      const start = document.getElementById('deliveryStart').value;
+      const end = document.getElementById('deliveryEnd').value;
+      if (!start || !end) {
+        alert("Please select both start and end dates.");
+        return;
+      }
+      google.script.run.withSuccessHandler(function(data){
+        let rows = data.records || [];
+        let totals = data.totals || { Cash: 0, Paytm: 0 };
+        if (rows.length === 0) {
+          document.getElementById('deliveryReport').innerHTML = '<p>No records found for the selected dates.</p>';
+          return;
+        }
+        let html = '<table><tr><th>Actual Delivery</th><th>Order No</th><th>Customer</th><th>Paid Amount</th><th>Payment Mode</th><th>Remarks</th></tr>';
+        rows.forEach(function(r){
+          html += `<tr>
+            <td>${r.actualDate}</td>
+            <td>${r.orderNumber}</td>
+            <td>${r.customerName}</td>
+            <td>\u20B9${Math.round(Number(r.amtPaid)||0)}</td>
+            <td>${r.mode.charAt(0).toUpperCase() + r.mode.slice(1)}</td>
+            <td style="max-width: 200px; word-wrap: break-word;">${r.remarks || '-'}</td>
+          </tr>`;
+        });
+        html += '</table>';
+        html += `<p><b>Total Cash:</b> \u20B9${Math.round(totals.Cash||0)}</p>`;
+        html += `<p><b>Total Paytm:</b> \u20B9${Math.round(totals.Paytm||0)}</p>`;
+        document.getElementById('deliveryReport').innerHTML = html;
+      }).generateDeliveryReport(start, end, getActiveSessionToken());
+    }
+
+    function generateCustomerHistory() {
+      const phone = document.getElementById('custPhone').value.trim();
+      if (!phone) return alert("Enter phone number");
+      google.script.run.withSuccessHandler(function(data){
+        if (!data || data.length === 0) {
+          document.getElementById('customerHistory').innerHTML = '<p>No history found for this phone number.</p>';
+          return;
+        }
+        let html = '<table><tr><th>Order No</th><th>Order Date</th><th>Delivery Date</th><th>Bill Amt</th><th>Paid Amt</th><th>Payment Mode</th><th>Remarks</th></tr>';
+        data.forEach(function(r){
+          html += `<tr>
+            <td>${r.orderNumber}</td>
+            <td>${r.orderDate}</td>
+            <td>${r.deliveryDate}</td>
+            <td>${Math.round(Number(r.totalAmount)||0)}</td>
+            <td>${Math.round(Number(r.amtPaid)||0)}</td>
+            <td>${r.mode}</td>
+            <td style="max-width: 200px; word-wrap: break-word;">${r.remarks || '-'}</td>
+          </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('customerHistory').innerHTML = html;
+      }).generateCustomerHistory(phone, getActiveSessionToken());
+    }
+
+    function generateOrderDateReport() {
+      const start = document.getElementById('orderDateStart').value;
+      const end = document.getElementById('orderDateEnd').value;
+      if (!start || !end) {
+        alert("Please select both start and end dates.");
+        return;
+      }
+      google.script.run.withSuccessHandler(function(data){
+        if (!data || !data.orders || data.orders.length === 0) {
+          document.getElementById('orderDateReport').innerHTML = '<p>No orders found for the selected date range.</p>';
+          document.getElementById('orderDateTotals').innerHTML = "";
+          return;
+        }
+        let html = '<table><tr><th>Order Date</th><th>Order No</th><th>Customer Name</th><th>Delivery Date</th><th>Total Amount</th><th>Status</th><th>Total Quantity</th></tr>';
+        data.orders.forEach(function(r){
+          html += `<tr>
+            <td>${r.orderDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.deliveryDate}</td><td>${Math.round(Number(r.totalAmount)||0)}</td><td>${r.status}</td><td>${r.totalQty}</td>
+          </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('orderDateReport').innerHTML = html;
+        document.getElementById('orderDateTotals').innerHTML = `<div style="margin-top:10px; font-weight:bold;">
+          Total Order Amount: \u20B9${Math.round(data.totalAmountSum||0)}<br>
+          Total Order Quantity: ${data.totalQtySum}
+        </div>`;
+      }).generateReport('orderDateRange', start, end, getActiveSessionToken());
+    }
+
+    function printDailyOrders() {
+      const content = document.getElementById('dailyOrdersReport').innerHTML;
+      const win = window.open('', '_blank', 'width=900,height=600');
+      win.document.write('<html><head><title>Pending Order Report</title></head><body><h2>Pending Order Report</h2>' + content + '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    }
+    function printDeliveryReport() {
+      const content = document.getElementById('deliveryReport').innerHTML;
+      const win = window.open('', '_blank', 'width=900,height=600');
+      win.document.write('<html><head><title>Delivery Report</title></head><body><h2>Delivery Report</h2>' + content + '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    }
+    function printCustomerHistory() {
+      const content = document.getElementById('customerHistory').innerHTML;
+      const win = window.open('', '_blank', 'width=900,height=600');
+      win.document.write('<html><head><title>Customer History</title></head><body><h2>Customer History</h2>' + content + '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    }
+    function printOrderDateReport() {
+      const content = document.getElementById('orderDateReport').innerHTML + document.getElementById('orderDateTotals').innerHTML;
+      const win = window.open('', '_blank', 'width=900,height=600');
+      win.document.write('<html><head><title>Order Date Range Report</title></head><body><h2>Order Date Range Report</h2>' + content + '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    }
+
+    function uploadLogo() {
+      const fileInput = document.getElementById('logoInput');
+      if (fileInput.files.length === 0) return alert("Please select an image file.");
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const base64 = e.target.result.split(',')[1];
+        google.script.run.withSuccessHandler(function(){
+          alert("Logo uploaded!");
+          google.script.run.withSuccessHandler(setLogo).getLogo(getActiveSessionToken());
+        }).uploadLogo(base64, getActiveSessionToken());
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+    
+    function saveAndSendInvoiceWhatsapp() {
+      const activeToken = getActiveSessionToken();
+      if (!activeToken) {
+        alert('Please login first.');
+        return;
+      }
+
+      const orderNumber = document.getElementById('orderNumber').value;
+      const phone = document.getElementById('phone').value.trim();
+      const customerName = document.getElementById('customerName').value.trim();
+      const totalAmount = document.getElementById('totalAmount').value;
+      const totalQuantity = document.getElementById('totalQuantity').value;
+
+      if (!orderNumber || !phone || !customerName) {
+        alert('Please save the order first and ensure Order Number, Customer Name, and Phone are filled.');
+        return;
+      }
+
+      const isAndroid = /Android/i.test(navigator.userAgent||'');
+      let whatsappWindow = null;
+      if(!isAndroid){
+        whatsappWindow = window.open('about:blank','LaundryBazaarWhatsApp');
+        if(!whatsappWindow){
+          alert('WhatsApp Web popup was blocked. Please allow popups for this site and press Open WhatsApp again.');
+          return;
+        }
+        whatsappWindow.document.write('<!doctype html><html><head><title>WhatsApp</title></head><body style="font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:20px;">Preparing invoice for WhatsApp Web...</body></html>');
+        whatsappWindow.document.close();
+      }
+
+      google.script.run
+        .withSuccessHandler(function(fileUrl) {
+          if (!fileUrl || String(fileUrl).indexOf('Error ') === 0 || String(fileUrl).indexOf('Error generating PDF') === 0) {
+            if(whatsappWindow) whatsappWindow.close();
+            alert('Unable to generate invoice PDF: ' + (fileUrl || 'Unknown error'));
+            return;
+          }
+
+          const countryCode = '91';
+          let phoneNumber = phone.replace(/\D/g, '');
+          if (phoneNumber.length === 10) phoneNumber = countryCode + phoneNumber;
+
+          const message = encodeURIComponent(
+            `Hello ${customerName}, your invoice from Laundry Bazaar is ready.\n` +
+            `Order Number: ${orderNumber}\n` +
+            `Total Amount: \u20B9${totalAmount}\n` +
+            `Total Quantity: ${totalQuantity}\n` +
+            `Download Invoice: ${fileUrl}`
+          );
+
+          const whatsappUrl = isAndroid
+            ? `https://wa.me/${phoneNumber}?text=${message}`
+            : `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${message}`;
+          if(isAndroid){
+            showAndroidAction('WhatsApp Ready','Tap below to open this chat in the WhatsApp app installed on your device.',whatsappUrl,'Open WhatsApp');
+          } else {
+            try {
+              whatsappWindow.location.href = whatsappUrl;
+              whatsappWindow.focus();
+            } catch(e) {
+              alert('Unable to open WhatsApp Web. Please allow popups and try again.');
+            }
+          }
+        })
+        .withFailureHandler(function(error) {
+          if(whatsappWindow) whatsappWindow.close();
+          alert('Error generating invoice: ' + (error && error.message ? error.message : error));
+        })
+        .saveInvoicePdfAndGetLink(orderNumber, activeToken);
+    }
+
+    function manualSendDailyReport() {
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('adminResult').innerHTML = '<div class="success">' + result + '</div>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('adminResult').innerHTML = '<div class="error">' + error + '</div>';
+      }).manualSendDailyReport(getActiveSessionToken());
+    }
+
+    function createEmailTrigger() {
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('adminResult').innerHTML = '<div class="success">' + result + '</div>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('adminResult').innerHTML = '<div class="error">' + error + '</div>';
+      }).createDailyEmailTrigger(getActiveSessionToken());
+    }
+
+    function checkEmailTriggers() {
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('adminResult').innerHTML = '<div class="info"><strong>Current Triggers:</strong><br>' + result.join('<br>') + '</div>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('adminResult').innerHTML = '<div class="error">' + error + '</div>';
+      }).checkTriggers(getActiveSessionToken());
+    }
+
+    function testSystem() {
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('adminResult').innerHTML = '<div class="info"><strong>System Test Results:</strong><br>' + result.join('<br>') + '</div>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('adminResult').innerHTML = '<div class="error">' + error + '</div>';
+      }).testSystem(getActiveSessionToken());
+    }
+  </script>
 </body>
 </html>
