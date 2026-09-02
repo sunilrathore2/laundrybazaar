@@ -287,10 +287,11 @@
     #tokenItemsTable table { width:100% !important; table-layout:fixed !important; border-collapse:collapse !important; }
     #tokenItemsTable th, #tokenItemsTable td { padding:4px 2px !important; font-size:11px !important; }
     #tokenItemsTable input, #tokenItemsTable select { width:100% !important; min-width:0 !important; font-size:11px !important; }
-    #tokenItemsTable th:nth-child(1), #tokenItemsTable td:nth-child(1) { width:20%; }
-    #tokenItemsTable th:nth-child(2), #tokenItemsTable td:nth-child(2) { width:45%; }
-    #tokenItemsTable th:nth-child(3), #tokenItemsTable td:nth-child(3) { width:29%; }
-    #tokenItemsTable th:nth-child(4), #tokenItemsTable td:nth-child(4) { width:6%; padding:0 !important; }
+    #tokenItemsTable th:nth-child(1), #tokenItemsTable td:nth-child(1) { width:13%; }
+    #tokenItemsTable th:nth-child(2), #tokenItemsTable td:nth-child(2) { width:39%; }
+    #tokenItemsTable th:nth-child(3), #tokenItemsTable td:nth-child(3) { width:23%; }
+    #tokenItemsTable th:nth-child(4), #tokenItemsTable td:nth-child(4) { width:18%; }
+    #tokenItemsTable th:nth-child(5), #tokenItemsTable td:nth-child(5) { width:7%; padding:0 !important; }
     #tokenItemsTable .item-input-stack { display:flex; flex-direction:column; gap:4px; width:100%; }
     #tokenItemsTable .token-remove-item { width:100% !important; min-width:0 !important; height:24px !important; min-height:24px !important; margin:0 !important; padding:0 !important; background:#dc3545 !important; color:#fff !important; font-size:16px !important; }
     .login-field {
@@ -591,7 +592,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token <small style="font-size:11px">v2.5 Compact</small></h2>
+    <h2>वॉइस टोकन <small style="font-size:11px">v2.6 हिन्दी / Lock / Rate</small></h2>
     <details class="voice-token-panel" id="guidedVoicePanel" style="padding:6px;margin:4px 0">
       <summary>सवाल-जवाब / Voice confirmation</summary>
       <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
@@ -907,7 +908,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(/^\d{10}$/.test(p)){
         const nameAtRequest=document.getElementById('tokenCustomerName').value;
         google.script.run.withSuccessHandler(function(n){
-          if(n && document.getElementById('tokenPhone').value.trim()===p && document.getElementById('tokenCustomerName').value===nameAtRequest) document.getElementById('tokenCustomerName').value=n;
+          if(n && hindiFormText_(n) && document.getElementById('tokenPhone').value.trim()===p && document.getElementById('tokenCustomerName').value===nameAtRequest) document.getElementById('tokenCustomerName').value=n;
         }).getCustomerByPhone(p, getActiveSessionToken());
       }
     }
@@ -928,7 +929,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       tokenVoicePending_=null;tokenVoiceDraft_=null;
       ['tokenNumber','tokenCustomerName','tokenPhone','tokenRemark'].forEach(function(id){document.getElementById(id).value='';});
       ['tokenDate','tokenDeliveryDate'].forEach(function(id){document.getElementById(id).value=new Date().toISOString().slice(0,10);});
-      renderTokenItemsTable([]);
+      renderTokenItemsTable([],true);
       document.getElementById('saveTokenBtn').disabled=true;
       if(typeof guidedVoice_!=='undefined'){guidedVoice_.entryPending=null;guidedVoice_.acceptEntryOnce=false;}
       if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=true;
@@ -943,7 +944,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         document.getElementById('tokenDeliveryDate').value = new Date().toISOString().slice(0,10);
         document.getElementById('tokenQuantity').value = 0;
         document.getElementById('tokenRemark').value = '';
-        renderTokenItemsTable([]);
+        renderTokenItemsTable([],true);
         document.getElementById('saveTokenBtn').disabled = false;
         document.getElementById('tokenError').textContent = '';
         if(typeof guidedVoice_!=='undefined'){guidedVoice_.loadingToken=false;guidedVoice_.maybeAuto();}
@@ -970,6 +971,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         remark: document.getElementById('tokenRemark').value.trim()
       };
       if(!obj.customerName) return alert('Customer Name required.');
+      if(!hindiFormText_(obj.customerName)||items.some(function(it){return !hindiFormText_(it.item);})||(obj.remark&&!hindiFormText_(obj.remark)))return alert('नाम, आइटम और रिमार्क हिन्दी में भरें। Service codes नहीं बदलें।');
       if(!/^\d{10}$/.test(obj.phone)) return alert('Phone must be exactly 10 digits.');
       if(!obj.deliveryDate) return alert('Delivery Date required.');
       if(!items.length || items.some(function(it){ return !it.service || !it.item || !Number.isInteger(Number(it.qty)) || Number(it.qty)<=0 || (/^(KG|KG WF)$/.test(it.service) && !(Number(it.weight)>0)); })) {
@@ -1001,7 +1003,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         return {
           service: row.querySelector('.token-service').value,
           item: row.querySelector('.token-item').value.trim(),
-          rate: 0,
+          rate: row.querySelector('.token-rate').value===''?'':Number(row.querySelector('.token-rate').value),
+          locked: row.dataset.locked==='true',
           qty: Number(row.querySelector('.token-qty').value)||0,
           weight: Number(row.querySelector('.token-weight').value)||0,
           amt: 0
@@ -1009,23 +1012,43 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       });
     }
 
-    function renderTokenItemsTable(items){
+    function hindiFormText_(value){return /[\u0900-\u097f]/.test(String(value||''))&&!/[a-z]/i.test(String(value||''));}
+    function hindiItem_(value){
+      var words={shirt:'शर्ट',tshirt:'टीशर्ट',pant:'पैंट',trouser:'पतलून',jeans:'जींस',coat:'कोट',full:'फुल',half:'हाफ',suit:'सूट',pcs:'पीस',jacket:'जैकेट',leather:'चमड़ा',normal:'सामान्य',sweater:'स्वेटर',cardigan:'कार्डिगन',kurta:'कुर्ता',plain:'सादा',fancy:'फैंसी',silk:'रेशम',salwar:'सलवार',saree:'साड़ी',cotton:'सूती',work:'वर्क',short:'छोटी',dress:'ड्रेस',knee:'घुटने',length:'लंबाई',maxi:'मैक्सी',long:'लंबी',delicate:'नाजुक',lehenga:'लहंगा',lining:'अस्तर',single:'सिंगल',double:'डबल',shawl:'शॉल',blanket:'कंबल',heavy:'भारी',towel:'तौलिया',large:'बड़ा',hand:'हाथ',face:'चेहरा',bedsheet:'चादर',quilt:'रजाई',carpet:'कालीन',sqft:'वर्ग फुट',curtains:'पर्दे',sofa:'सोफा',cover:'कवर',medium:'मध्यम',small:'छोटा',sports:'स्पोर्ट्स',canvas:'कैनवास',suede:'सुएड',shoe:'जूता',shoes:'जूते',blazer:'ब्लेजर'};
+      return String(value||'').replace(/[a-z]+/gi,function(w){return words[w.toLowerCase()]||w;});
+    }
+    function renderTokenItemsTable(items, allowLockedChanges){
       items = Array.isArray(items) ? items : [{service:'',item:'',rate:'',qty:1,weight:'',amt:0}];
-      var html = '<table><thead><tr><th>Qty</th><th>Item</th><th>Service</th><th></th></tr></thead><tbody>';
+      if(!allowLockedChanges)getTokenItems().forEach(function(old,i){if(old.locked)items[i]=old;});
+      var html = '<table style="table-layout:fixed;width:100%"><colgroup><col style="width:13%"><col style="width:39%"><col style="width:23%"><col style="width:18%"><col style="width:7%"></colgroup><thead><tr><th>Qty</th><th>Item</th><th>Service</th><th>Rate ₹</th><th></th></tr></thead><tbody>';
       items.forEach(function(it, i){
+        it.item=hindiItem_(it.item);
         var options = serviceOptions.filter(function(opt){return !/^(BLK|WF)$/i.test(String(opt).trim());}).map(function(opt){
           return '<option value="'+escapeHtml(opt)+'" '+(String(it.service||'').trim().toLowerCase()===String(opt||'').trim().toLowerCase()?'selected':'')+'>'+escapeHtml(opt)+'</option>';
         }).join('');
-        html += '<tr class="tokenItemRow">'+
+        html += '<tr class="tokenItemRow" data-locked="'+!!it.locked+'">'+
           '<td><input class="token-qty" type="number" min="1" step="1" value="'+(it.qty == null ? 1 : Number(it.qty))+'" oninput="calcTokenItemRow(this)"></td>'+
           '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"><button type="button" class="btn" onclick="guidedVoice_.correctItem('+i+')">🎤 सुधारें '+(i+1)+'</button></div></td>'+
           '<td><select class="token-service" onchange="handleTokenServiceChange(this)"><option value="">Select</option>'+options+'</select></td>'+
+          '<td><input class="token-rate" type="number" min="0" step="1" placeholder="Rate" aria-label="Rate" value="'+escapeHtml(it.rate==null?'':it.rate)+'" style="width:100%;min-width:0"></td>'+
           '<td><button class="btn token-remove-item" type="button" aria-label="Remove item '+(i+1)+'" title="Remove item" onclick="removeTokenItemRow('+i+')">&times;</button></td></tr>';
       });
       html += '</tbody></table>';
       document.getElementById('tokenItemsTable').innerHTML = html;
       document.querySelectorAll('.token-service').forEach(handleTokenServiceChange);
+      document.querySelectorAll('.tokenItemRow').forEach(function(row,i){
+        var edit=row.querySelector('.item-input-stack button');edit.style.cssText='padding:3px;margin:0;font-size:11px;min-width:0';
+        var actions=document.createElement('div');actions.style.cssText='display:flex;gap:3px;flex-wrap:wrap';edit.parentNode.appendChild(actions);actions.appendChild(edit);
+        var lock=document.createElement('button');lock.type='button';lock.className='btn';lock.textContent=items[i].locked?'Unlock':'Lock करें';lock.style.cssText=edit.style.cssText;lock.onclick=function(){toggleTokenItemLock_(i);};actions.appendChild(lock);
+        if(items[i].locked)row.querySelectorAll('input,select,button').forEach(function(el){if(el!==lock)el.disabled=true;});
+      });
       calcTokenTotals();
+    }
+
+    function toggleTokenItemLock_(index){
+      stopVoiceToken();var rows=getTokenItems(),row=rows[index];if(!row)return;
+      if(!row.locked&&(!row.item||!row.service||!Number.isInteger(row.qty)||row.qty<=0||(/^(KG|KG WF)$/.test(row.service)&&!(row.weight>0))||(row.rate!==''&&(!Number.isFinite(row.rate)||row.rate<0)))){alert('पहले सही item, quantity, service और जरूरत पर weight/rate भरें।');return;}
+      row.locked=!row.locked;renderTokenItemsTable(rows,true);tokenVoiceDraft_=null;
     }
 
     function addTokenItemRow(){
@@ -1039,8 +1062,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(tokenVoiceActive_||(typeof guidedVoice_!=='undefined'&&guidedVoice_.active))stopVoiceToken();
       var items = getTokenItems();
       if(!Number.isInteger(index)||index<0||index>=items.length)return;
+      if(items[index].locked){alert('पहले item Unlock करें।');return;}
       items.splice(index, 1);
-      renderTokenItemsTable(items);
+      renderTokenItemsTable(items,true);
     }
 
     function handleTokenServiceChange(select){
@@ -1326,7 +1350,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     function voiceDateToIso_(text){return voiceReadDate_(String(text||'').replace(/^\s*(?:delivery\s*(?:date)?|डिलीवरी\s*(?:डेट|तारीख)?|date|तारीख)\s*[:\-]?\s*/i,'')).value;}
 
-    function voiceBlankItem_(){return {service:'',item:'',qty:0,weight:0,rate:0,amt:0};}
+    function voiceBlankItem_(){return {service:'',item:'',qty:0,weight:0,rate:'',amt:0};}
+    function readVoiceRate_(input){
+      var text=voiceNumberText_(normalizeVoiceAliases_(input));
+      var pattern=/(?:\brate\s+)?(\d+(?:\.\d+)?)\s*(?:rupees|rupee|rs\.?|रुपये|रुपए|रुपया|रुपए|रूपये)(?:\s*(?:वाला|वाली|वाले|wala|wali|wale))?/i;
+      var m=text.match(pattern);return {rate:m?Number(m[1]):null,rest:m?text.replace(pattern,'').trim():text};
+    }
     function voiceIsBlankItem_(item){return !item.item && !item.service && !Number(item.weight) && (!Number(item.qty)||Number(item.qty)===1);}
 
     function voiceReadItems_(input){
@@ -1346,6 +1375,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var leading=/^\s*(?:और|aur|and)(?=\s|$)/i.test(text),trailing=/(?:^|\s)(?:और|aur|and)\s*$/i.test(text);
       chunks.forEach(function(chunk){
         chunk=voiceClean_(chunk).replace(/[,;।\n]+/g,' ');if(!chunk)return;
+        var price=readVoiceRate_(chunk);chunk=price.rest;
         var revisions=chunk.split(/\s*~\s*/).filter(function(part){return part.trim();}),revised=revisions.shift();
         revisions.forEach(function(part){
           if(/^\d+$/.test(part.trim()))revised=revised.replace(/^\d+/,part.trim());
@@ -1382,7 +1412,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         }
         if(!Number.isInteger(qty)||qty<=0)issues.push('Quantity must be a positive whole number.');
         if(!service)issues.push('Select the service for: '+item);
-        rows.push({service:service,item:normalizeVoiceItem_(item),qty:qty,weight:weight,rate:0,amt:0});
+        rows.push({service:service,item:normalizeVoiceItem_(item),qty:qty,weight:weight,rate:price.rate===null?'':price.rate,amt:0});
       });
       if(trailing)rows.push(voiceBlankItem_());
       return {items:rows,issues:issues,leadingSeparator:leading};
@@ -1474,7 +1504,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var rows=base.map(function(it){return Object.assign({},it);});
       incoming.forEach(function(it,index){
         if(index===0 && !leadingSeparator && rows.length && !voiceIsBlankItem_(it) && !voiceIsBlankItem_(rows[rows.length-1])){
-          var old=rows[rows.length-1];rows[rows.length-1]=Object.assign({},old,it,{service:it.service||old.service});return;
+          var old=rows[rows.length-1];if(old.locked)return;rows[rows.length-1]=Object.assign({},old,it,{service:it.service||old.service,rate:it.rate===''?old.rate:it.rate});return;
         }
         if(rows.length&&voiceIsBlankItem_(rows[rows.length-1])){
           if(!voiceIsBlankItem_(it))rows[rows.length-1]=Object.assign({},it);
@@ -1484,7 +1514,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
     function fillVoiceTokenForm_(data, base){
       base=base||{items:getTokenItems(),name:document.getElementById('tokenCustomerName').value,phone:document.getElementById('tokenPhone').value,deliveryDate:document.getElementById('tokenDeliveryDate').value,remark:document.getElementById('tokenRemark').value};
-      document.getElementById('tokenCustomerName').value=data.fields.name?data.name:base.name;
+      document.getElementById('tokenCustomerName').value=data.fields.name&&hindiFormText_(data.name)?data.name:base.name;
       document.getElementById('tokenPhone').value=data.fields.phone?data.phone:base.phone;
       document.getElementById('tokenDeliveryDate').value=data.deliveryDate||base.deliveryDate;
       document.getElementById('tokenRemark').value=data.fields.remark?data.remark:base.remark;
@@ -1493,6 +1523,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
     function applyVoiceTokenSpeech_(text, finalResult){
       if(!tokenVoiceActive_)return;
+      var spokenRate=readVoiceRate_(text);
+      if(tokenVoiceScope_==='items'&&spokenRate.rate!==null&&!spokenRate.rest){
+        if(finalResult){var current=getTokenItems(),last=current.length-1;if(last>=0&&!current[last].locked){current[last].rate=spokenRate.rate;renderTokenItemsTable(current);tokenVoiceDraft_=null;}else document.getElementById('voiceItemsStatus').textContent='पहले item जोड़ें या Unlock करें।';}return;
+      }
       if(!tokenVoiceDraft_)beginVoiceTokenDraft_();
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
       if(tokenVoiceScope_==='items'){
@@ -1538,7 +1572,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         }
         renderTokenItemsTable(mergeVoiceItems_(base.items,data.items,data.leadingSeparator));calcTokenTotals();
       }else if(tokenVoiceScope_==='details'){
-        if(data.fields.name)document.getElementById('tokenCustomerName').value=data.name;
+        if(data.fields.name&&hindiFormText_(data.name))document.getElementById('tokenCustomerName').value=data.name;
         if(data.fields.phone)document.getElementById('tokenPhone').value=data.phone;
         if(data.deliveryDate)document.getElementById('tokenDeliveryDate').value=data.deliveryDate;
       }else fillVoiceTokenForm_(data,base);
@@ -1676,7 +1710,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
             document.getElementById('phone').value = tok.phone || '';
             document.getElementById('customerName').value = tok.customerName || '';
             document.getElementById('deliveryDate').value = tok.deliveryDate || document.getElementById('orderDate').value;
-            if(Array.isArray(tok.items) && tok.items.length) renderItemsTable(tok.items.map(function(it){ return {service:it.service,item:it.item,qty:it.qty,weight:it.weight,rate:'',amt:0}; }));
+            if(Array.isArray(tok.items) && tok.items.length) renderItemsTable(tok.items.map(function(it){ return {service:it.service,item:it.item,qty:it.qty,weight:it.weight,rate:it.rate==null?'':it.rate,amt:0}; }));
             var tokenContinuation = 'Token Number: ' + (tok.tokenNumber || '') +
               ' | Total Quantity: ' + (tok.quantity || 0) +
               ' | Remark: ' + (tok.remark || '—');
@@ -2681,9 +2715,24 @@ var guidedVoice_ = {
     return null;
   },
   rows:function(){return getTokenItemsForSave_();},
+  validEntry:function(state,text){
+    if(state==='phone'){var p=voiceReadPhone_(text.replace(/^(?:phone|mobile|फोन|मोबाइल)(?:\s*(?:number|नंबर))?\s*/i,''));return p.value.length>0&&!p.rest.trim()&&!p.error;}
+    if(state==='name'){return hindiFormText_(text)&&this.yesNo(text)===null&&text.trim().split(/\s+/).length<=6;}
+    if(state==='date'){
+      var dateWords=voiceNumberText_(text).toLowerCase().replace(/(?:delivery|date|today|tomorrow|day after tomorrow|parso|parson|narso|डिलीवरी|डिलिवरी|तारीख़?|तारिख|डेट|आज|परसों|परसो|नरसों|नरसो|कल|जनवरी|फरवरी|फ़रवरी|मार्च|अप्रैल|मई|जून|जुलाई|अगस्त|सितंबर|सितम्बर|अक्टूबर|नवंबर|नवम्बर|दिसंबर|दिसम्बर|january|february|march|april|may|june|july|august|september|october|november|december|देना|करना|है|को|की|में|तक|दिन)/gi,'').replace(/[\d\s.,/\-]+/g,'');
+      return !!voiceDateToIso_(text)&&!dateWords;
+    }
+    if(state==='remark')return this.yesNo(text)===false||hindiFormText_(text);
+    if(state==='rate'){var price=readVoiceRate_(text);return price.rate!==null&&!price.rest;}
+    if(state==='service')return !!resolveVoiceService_(text,false)||this.validEntry('weight',text);
+    if(state==='weight'){var t=voiceNumberText_(text).replace(/^(?:वजन|वज़न|weight)\s*/i,'');if(/^\d+(?:\.\d+)?$/.test(t))t+=' kg';var w=voiceReadItems_('1 Weight '+t);return w.items.length===1&&w.items[0].weight>0&&!w.issues.length;}
+    if(state==='item'){var r=voiceReadItems_(text);return r.items.length>0&&r.items.every(function(it){return Number.isInteger(it.qty)&&it.qty>0&&hindiFormText_(hindiItem_(it.item));})&&!r.issues.some(function(x){return !/^(Select the service|Weight is required)/.test(x);});}
+    return true;
+  },
   correctItem:function(index){
     if(!currentUser||!getActiveSessionToken())return;
     var rows=getTokenItems();if(!rows[index])return;
+    if(rows[index].locked){alert('पहले item Unlock करें।');return;}
     var target=rows[index],selectedIndex=rows.slice(0,index).filter(function(r){return !voiceIsBlankItem_(r);}).length;
     rows=rows.filter(function(r){return !voiceIsBlankItem_(r);});
     if(voiceIsBlankItem_(target))rows.splice(selectedIndex,0,target);
@@ -2695,7 +2744,7 @@ var guidedVoice_ = {
     var rows=this.rows();if(rows.length){this.itemIndex=0;this.nextItemField();}else{this.itemIndex=0;this.ask('item','कितने और कौन से कपड़े हैं? जैसे, दो शर्ट वॉश आयरन।');}
   },
   nextItemField:function(){
-    var rows=this.rows();
+      var rows=this.rows();
     for(var i=this.itemIndex;i<rows.length;i++){
       this.itemIndex=i;var row=rows[i];
       if(!row.item||!Number.isInteger(Number(row.qty))||Number(row.qty)<=0){this.ask('item','इस कपड़े की सही quantity और नाम बोलें।');return;}
@@ -2713,7 +2762,7 @@ var guidedVoice_ = {
     if(!rows.length){this.itemIndex=0;this.ask('item','पहले quantity और कपड़े का नाम बोलें।');return;}
     var bad=rows.findIndex(function(r){return !r.item||!r.service||!Number.isInteger(Number(r.qty))||Number(r.qty)<=0||(/^(KG|KG WF)$/.test(r.service)&&!(Number(r.weight)>0));});
     if(bad>=0){this.itemIndex=bad;this.nextItemField();return;}
-    var readable=rows.map(function(r){return r.qty+' '+r.item+', '+r.service+(/^(KG|KG WF)$/.test(r.service)?', वजन '+r.weight+' किलो':'');}).join('। ');
+    var readable=rows.map(function(r){return r.qty+' '+r.item+', '+r.service+(/^(KG|KG WF)$/.test(r.service)?', वजन '+r.weight+' किलो':'')+(r.rate!==''&&r.rate!=null?', रेट '+r.rate+' रुपये':'');}).join('। ');
     this.reviewSnapshot=this.snapshot();
     this.ask('review','जाँच लें। नाम '+this.value('tokenCustomerName')+'। फोन '+this.value('tokenPhone').split('').join(' ')+'। डिलीवरी '+this.value('tokenDeliveryDate')+'। '+readable+'। रिमार्क '+(this.value('tokenRemark')||'नहीं')+'। टोकन सेव कर दूँ? हाँ या नहीं बोलें।');
   },
@@ -2723,21 +2772,28 @@ var guidedVoice_ = {
     this.cancelInput();this.promptId='';this.el('guidedTranscript').textContent=text;
     if(/^(stop|cancel|रुको|रुकिए|बंद करो|रद्द करो)$/i.test(text)){this.stop(true);return;}
     var state=this.state,rows=this.rows(),result;
+    var rateReply=readVoiceRate_(text);
+    if(state!=='confirm_entry'&&/^(more|service|weight|rate)$/.test(state)&&rateReply.rate!==null&&!rateReply.rest){state='rate';this.state=state;}
     var correction=voiceNumberText_(text).match(/^(?:line|row|लाइन|पंक्ति)\s+(\d+)\s+(?:correct|edit|change|सुधारो|सुधारें|बदलो|बदलें)$/i);
     if(correction){var index=Number(correction[1])-1;if(index>=0&&index<getTokenItems().length)this.correctItem(index);else this.ask(state,'यह लाइन नहीं मिली। सही लाइन नंबर बोलें।');return;}
     if(state==='confirm_entry'){
       var pending=this.entryPending,accepted=this.yesNo(text);
       if(!pending){this.stop(true);return;}
       if(accepted===true){this.entryPending=null;this.state=pending.state;this.acceptEntryOnce=true;this.listening=true;this.receive(pending.text);}
-      else if(accepted===false){this.entryPending=null;this.ask(pending.state,'ठीक है, '+pending.label+' दोबारा बोलें।');}
+      else if(accepted===false){this.entryPending=null;this.el('guidedTranscript').textContent='';this.ask(pending.state,'ठीक है, '+pending.label+' दोबारा बोलें।');}
       else this.ask('confirm_entry','मैंने सुना '+pending.text+'। सही है? हाँ या नहीं बोलें, या बटन दबाएँ।');
       return;
     }
-    if(/^(phone|name|date|item|service|weight|remark)$/.test(state)&&!this.acceptEntryOnce){
-      var labels={phone:'फोन नंबर',name:'नाम',date:'डिलीवरी तारीख',item:'आइटम',service:'सर्विस',weight:'वजन',remark:'रिमार्क'};
+    if(/^(phone|name|date|item|service|weight|remark|rate)$/.test(state)&&!this.acceptEntryOnce){
+      var labels={phone:'फोन नंबर',name:'नाम',date:'डिलीवरी तारीख',item:'आइटम',service:'सर्विस',weight:'वजन',remark:'रिमार्क',rate:'रेट'};
+      if(!this.validEntry(state,text)){this.entryPending=null;this.el('guidedTranscript').textContent='';this.ask(state,labels[state]+' का सही जवाब दोबारा बोलें। नाम और आइटम हिन्दी में रखें।');return;}
       this.entryPending={state:state,text:text,label:labels[state]};this.ask('confirm_entry',labels[state]+': '+text+'। सही है?');return;
     }
     this.acceptEntryOnce=false;
+    if(state==='rate'){
+      var target=this.itemIndex;if(!rows[target]||rows[target].locked){this.ask('more','पहले आइटम जोड़ें या Unlock करें। और कपड़े हैं?');return;}
+      rows[target].rate=rateReply.rate;this.render(rows);this.nextItemField();return;
+    }
     if(state==='phone'){
       var phoneText=text.replace(/^(?:phone|mobile|फोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?\s*/i,'');
       var phone=voiceReadPhone_(phoneText);
@@ -2750,7 +2806,7 @@ var guidedVoice_ = {
       google.script.run.withSuccessHandler(function(name){
         if(!self.active||self.epoch!==epoch||self.value('tokenPhone')!==phone.value)return;
         if(self.timer){clearTimeout(self.timer);self.timer=null;}
-        if(typeof name==='string'&&name.trim()){self.entryPending={state:'name',text:name.trim(),label:'नाम'};self.ask('confirm_entry','इस नंबर पर नाम '+name.trim()+' मिला। सही है?');}
+        if(typeof name==='string'&&hindiFormText_(name)){self.entryPending={state:'name',text:name.trim(),label:'नाम'};self.ask('confirm_entry','इस नंबर पर नाम '+name.trim()+' मिला। सही है?');}
         else self.ask('name','इस नंबर का नाम नहीं मिला। आपका नाम क्या है?');
       }).withFailureHandler(function(e){if(self.active&&self.epoch===epoch)self.fail('Customer lookup नहीं हुआ: '+(e.message||e));}).getCustomerByPhone(phone.value,getActiveSessionToken());return;
     }
