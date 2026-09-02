@@ -591,7 +591,17 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.9</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.0</small></h2>
+    <div class="voice-token-panel" id="guidedVoicePanel">
+      <h3>सवाल-जवाब से Token भरें</h3>
+      <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
+      <button class="btn" type="button" onclick="guidedVoice_.stop(true)">Stop / Review manually</button>
+      <label style="display:block;margin:8px 0"><input id="guidedAutoStart" type="checkbox" onchange="guidedVoice_.setAuto(this)" style="width:auto"> मेरी अनुमति से Token खोलते ही सवाल पूछें</label>
+      <div id="guidedQuestion" role="status" aria-live="polite">शुरू करें दबाएँ। पहले फोन नंबर पूछा जाएगा।</div>
+      <div id="guidedTranscript" style="overflow-wrap:anywhere;margin:8px 0"></div>
+      <input id="guidedAnswer" type="text" placeholder="आवाज़ न चले तो जवाब यहाँ लिखें" onkeydown="if(event.key==='Enter')guidedVoice_.submitTyped()">
+      <button class="btn" type="button" onclick="guidedVoice_.submitTyped()">जवाब भेजें</button>
+    </div>
     <div id="tokenBackendStatus" class="info" role="status"></div>
     <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
     <div class="voice-token-panel" id="customerVoicePanel">
@@ -706,6 +716,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function showTab(tabId, evt) {
+      if(tabId!=='tokenSection')stopVoiceToken();
       document.querySelectorAll('.section').forEach(function(div){ div.classList.remove('active'); });
       document.querySelectorAll('.tab').forEach(function(tab){ tab.classList.remove('active'); });
       const section = document.getElementById(tabId);
@@ -720,6 +731,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       }
       if (tabId === 'tokenSection' && getActiveSessionToken() && currentUser) {
         loadTokens();
+        if(typeof guidedVoice_!=='undefined')guidedVoice_.maybeAuto();
       }
     }
 
@@ -821,6 +833,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function doLogout(){
+      stopVoiceToken();
       var t = getActiveSessionToken();
       localStorage.removeItem('lbSession');
       sessionToken = '';
@@ -887,6 +900,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         document.getElementById('tokenError').textContent='Login must be verified by the backend before a token number can be requested.';return;
       }
       stopVoiceToken();
+      if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=true;
       document.getElementById('tokenError').textContent='Requesting token number from backend…';
       google.script.run.withSuccessHandler(function(n){
         tokenVoicePending_=null;tokenVoiceDraft_=null;tokenVoiceActive_=false;
@@ -900,7 +914,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         renderTokenItemsTable([]);
         document.getElementById('saveTokenBtn').disabled = false;
         document.getElementById('tokenError').textContent = '';
+        if(typeof guidedVoice_!=='undefined'){guidedVoice_.loadingToken=false;guidedVoice_.maybeAuto();}
       }).withFailureHandler(function(e){
+        if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=false;
         document.getElementById('tokenError').textContent = 'Unable to get new token number: '+(e.message||e);
       }).getNewTokenNumber(getActiveSessionToken());
     }
@@ -931,12 +947,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       google.script.run
         .withSuccessHandler(function(n){
           document.getElementById('tokenError').textContent = 'Token Saved: '+n+' | Status: Pending';
+          if(typeof guidedVoice_!=='undefined')guidedVoice_.el('guidedQuestion').textContent='Token '+n+' save हो गया। नया customer हो तो शुरू करें दबाएँ।';
           document.getElementById('tokenError').className = 'success';
           loadTokens();
           newToken();
         })
         .withFailureHandler(function(e){
           document.getElementById('tokenError').textContent = 'Error: '+(e.message||e);
+          if(typeof guidedVoice_!=='undefined')guidedVoice_.el('guidedQuestion').textContent='Save की पुष्टि नहीं हुई: '+(e.message||e)+'. दोबारा save करने से पहले token list जाँचें।';
           document.getElementById('tokenError').className = 'error';
           document.getElementById('saveTokenBtn').disabled = false;
         })
@@ -976,13 +994,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function addTokenItemRow(){
+      if(typeof guidedVoice_!=='undefined'&&guidedVoice_.active)guidedVoice_.stop(true);
       var items = getTokenItems();
       items.push({service:'',item:'',rate:'',qty:1,weight:'',amt:0});
       renderTokenItemsTable(items);
     }
 
     function removeTokenItemRow(index){
-      if(tokenVoiceActive_)stopVoiceToken();
+      if(tokenVoiceActive_||(typeof guidedVoice_!=='undefined'&&guidedVoice_.active))stopVoiceToken();
       var items = getTokenItems();
       if(!Number.isInteger(index)||index<0||index>=items.length)return;
       items.splice(index, 1);
@@ -1017,6 +1036,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function stopVoiceToken(){
+      if(typeof guidedVoice_!=='undefined'&&guidedVoice_.active)guidedVoice_.stop(false);
       tokenVoiceEpoch_++;tokenVoiceContinuous_=false;
       voiceButtons_(false);
       voiceStatus_('Voice stopped.');
@@ -1090,7 +1110,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function normalizeVoiceAliases_(text){
-      var value = String(text||'').replace(/(\d)(?=kgs?\b)/gi,'$1 ');
+      var value = String(text||'').replace(/(\d)(?=kgs?\b)/gi,'$1 ').replace(/\bkg\s*-\s*gram\b/gi,'kg');
       var aliases = [
         [/\b(?:w|dablu|dabloo|dab[lw]oo|double\s*u)\s*\.?\s*(?:i|aai|ai|eye)\b|(?:डब्ल्यू|डब्लू|डबल्यू|डबलू|डबल यू|डब्ल्यु|डबल्यु)\s*(?:आई|आइ|ई)/gi,'WI'],
         [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
@@ -1110,7 +1130,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\bi\s*\.?\s*r\b|आई\s*आर/gi,'IR'],
         [/\b(?:(?:only|just|khali|sirf)\s+)?(?:iron(?:ing)?|press(?:ing)?|istri|istree)(?:\s+(?:press|iron(?:ing)?))?(?:\s+(?:karna|karo|kar\s*do))?(?:\s+hai)?\b/gi,'IR'],
         [/(?:(?:खाली|सिर्फ|केवल)\s*)?(?:आयरनिंग|आयरन|प्रेस|प्रैस|इस्त्री|इस्तरी)(?:\s*(?:प्रेस|आयरनिंग|आयरन))?(?:\s*(?:करना|करो|कर\s*दो))?(?:\s*है)?/g,'IR'],
-        [/\b(?:k\s*\.?\s*g\.?|kgs?|kilo(?:gram)?s?)\b|के\s*\.?\s*जी\.?|केज|किलो(?:ग्राम)?/gi,'kg'],
+        [/\b(?:k\s*\.?\s*g\.?|kgs?|kilo(?:\s*gram)?s?)\b|के\s*\.?\s*जी\.?|केज|किलो(?:\s*ग्राम)?/gi,'kg'],
         [/\b(?:s\s*h|shoe[s]?\s*clean(?:ing)?)\b|एस\s*एच|शू(?:ज़|ज)?\s*क्लीनिंग|जूते\s*की\s*सफाई/gi,'SH'],
         [/\b(?:sooj|jute|joote|joota|shoes?)\b|जूते|जूता|जुते|शूज़|शूज|शू/gi,'shoe'],
         [/\bb\s*l\s*k\b|बी\s*एल\s*के/gi,'BLK'],
@@ -1125,13 +1145,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:mobail|mobyle)\b|मोबाइल/gi,'mobile']
       ];
       aliases.forEach(function(pair){ value = value.replace(pair[0], pair[1]); });
-      return value.replace(/\bkg\s+WF\b/gi,'KG WF').replace(/\s+/g,' ').trim();
+      return value.replace(/\bWF\s+kg\b/gi,'KG WF').replace(/\b(?:kg\s+)?WF\b/gi,'KG WF').replace(/\s+/g,' ').trim();
     }
 
 
     function resolveVoiceService_(spoken, isKg){
       var cleaned = normalizeVoiceAliases_(spoken).toLowerCase().replace(/\b(ki|ka|ke|me|mein|service|hai|hain)\b|की|का|के|में|सर्विस|हैं|है/g,' ').replace(/\s+/g,' ').trim();
-      var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold)$/.test(cleaned) ? 'WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
+      if(/^(grams?|ग्राम)$/.test(cleaned))cleaned='kg';
+      var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold|kg wf)$/.test(cleaned) ? 'KG WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
       var exact=serviceOptions.find(function(opt){return String(opt).trim().toUpperCase()===code;});
       if(exact)return exact;
       return serviceOptions.find(function(opt){
@@ -1436,6 +1457,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
       if(tokenVoiceScope_==='items'){
         var command=voiceClean_(normalizeVoiceAliases_(text)).replace(/^(?:service|सर्विस|सेवा)\s+/i,'').trim();
+        if(/^(grams?|ग्राम)$/.test(command))command='KG';
         if(/^(?:KG WF|WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:KG WF|WI|WF|DC|IR|SH|BLK|KG))*$/i.test(command)){
           var code=command.match(/KG WF|WI|WF|DC|IR|SH|BLK|KG/gi).pop().toUpperCase(),selected=resolveVoiceService_(code,code==='KG'),target=base.items.length-1;
           while(target>=0&&!base.items[target].item)target--;
@@ -1573,12 +1595,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     window.onAndroidVoicePartial = function(text){ applyVoiceTokenSpeech_(String(text||''),false); };
     document.addEventListener('visibilitychange',function(){if(document.hidden&&tokenVoiceActive_)stopVoiceToken();});
     window.onAndroidVoiceResult = function(text, mode){
+      if(mode==='guided'){if(typeof guidedVoice_!=='undefined')guidedVoice_.receive(text);return;}
       text=String(text||'').trim();
       if(mode==='confirmation'){handleVoiceTokenConfirmation_(text);return;}
       applyVoiceTokenSpeech_(text,true);
     };
 
     window.onAndroidVoiceError = function(message){
+      if(typeof guidedVoice_!=='undefined'&&guidedVoice_.active){guidedVoice_.fail(String(message||'Microphone error'));return;}
       tokenVoiceContinuous_=false;tokenVoiceEpoch_++;voiceButtons_(false);voiceStatus_(String(message||'Voice stopped.'));
       tokenVoiceActive_=false;tokenVoiceDraft_=null;
       document.getElementById('voiceTokenStatus').textContent = String(message||'Android voice recognition failed.');
@@ -1719,10 +1743,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     function setServices(opts) {
       var existingItems=getTokenItems();
-      serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(Boolean) : [];
+      serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(function(s){return s&&s.toUpperCase()!=='WF';}) : [];
       tokenServicesReady_=serviceOptions.length>0;
       // These are the owner's confirmed token service codes, not invented prices.
-      if(tokenServicesReady_)['WI','WF','DC','IR','SH','BLK','KG','KG WF'].forEach(function(code){
+      if(tokenServicesReady_)['WI','DC','IR','SH','BLK','KG','KG WF'].forEach(function(code){
         if(!serviceOptions.some(function(s){return s.toUpperCase()===code;}))serviceOptions.push(code);
       });
       if(!serviceOptions.some(function(s){ return /^(KG|KG WF)$/.test(String(s).trim().toUpperCase()); })) serviceOptions.push('KG');
@@ -1735,10 +1759,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           return '<option value="'+escapeHtml(code)+'"'+(code===selected?' selected':'')+'>'+escapeHtml(code)+'</option>';
         }).join('');
       });
-      var missing=['WI','WF','DC','IR'].filter(function(code){return !resolveVoiceService_(code,false);});
+      var missing=['WI','KG WF','DC','IR'].filter(function(code){return !resolveVoiceService_(code,false);});
       document.getElementById('tokenBackendStatus').textContent=tokenServicesReady_?
-        'Backend services loaded.'+(missing.length?' Missing in Services sheet: '+missing.join(', ')+'.':' WI / WF / DC / IR ready.'):
+        'Backend services loaded.'+(missing.length?' Missing in Services sheet: '+missing.join(', ')+'.':' WI / KG WF / DC / IR ready.'):
         'Backend returned no services. Check the Services sheet and Apps Script execution errors.';
+      if(typeof guidedVoice_!=='undefined')guidedVoice_.maybeAuto();
     }
     function loadTokenServices_(){
       if(!currentUser||!getActiveSessionToken()){
@@ -2512,5 +2537,200 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       }).testSystem(getActiveSessionToken());
     }
   </script>
+<script>
+// Guided Token: each final answer is handled once; no network AI service is used.
+var guidedVoice_ = {
+  active:false, state:'', epoch:0, promptId:'', listening:false, recognition:null,
+  timer:null, phoneBuffer:'', itemIndex:0, lastAuto:'', loadingToken:false, suppressAutoOnce:false,
+  el:function(id){return document.getElementById(id);},
+  value:function(id){return this.el(id).value.trim();},
+  cancelInput:function(){
+    this.listening=false;
+    if(this.timer){clearTimeout(this.timer);this.timer=null;}
+    if(this.recognition){var r=this.recognition;this.recognition=null;try{r.abort();}catch(e){}}
+    if(window.AndroidVoice&&window.AndroidVoice.stopRecognition)window.AndroidVoice.stopRecognition();
+    if(window.speechSynthesis)window.speechSynthesis.cancel();
+  },
+  stop:function(show){
+    this.active=false;this.epoch++;this.promptId='';this.cancelInput();
+    if(show)this.el('guidedQuestion').textContent='बातचीत रुकी। भरी हुई जानकारी सुरक्षित है। जाँचें या फिर शुरू करें।';
+  },
+  fail:function(message){this.stop(false);this.el('guidedQuestion').textContent=message+' फिर शुरू करें दबाएँ या manual form भरें।';},
+  setAuto:function(box){
+    if(box.checked&&!confirm('Token खोलने पर ऐप सवाल बोलेगा और microphone से जवाब सुनेगा। क्या आप इसे चालू करना चाहते हैं?'))box.checked=false;
+    localStorage.setItem('lbGuidedAutoStart',box.checked?'yes':'no');
+    if(box.checked){this.lastAuto='';this.maybeAuto();}else if(this.active)this.stop(true);
+  },
+  maybeAuto:function(){
+    var enabled=localStorage.getItem('lbGuidedAutoStart')==='yes';
+    this.el('guidedAutoStart').checked=enabled;
+    if(!enabled||this.active||this.loadingToken||!currentUser||!tokenServicesReady_||!this.el('tokenSection').classList.contains('active')||document.hidden)return;
+    var number=this.value('tokenNumber');if(!number||this.lastAuto===number)return;
+    if(this.suppressAutoOnce){this.lastAuto=number;this.suppressAutoOnce=false;return;}
+    // Browser autoplay restrictions require an explicit Start gesture. Native app supports opt-in auto-start.
+    if(!window.AndroidVoice||!window.AndroidVoice.speakPrompt){this.el('guidedQuestion').textContent='सवाल-जवाब के लिए शुरू करें दबाएँ। Auto-start के लिए updated Android app चाहिए।';return;}
+    this.start();
+  },
+  start:function(){
+    if(!currentUser||!getActiveSessionToken()){this.el('guidedQuestion').textContent='पहले backend से login पूरा करें।';return;}
+    if(this.loadingToken||!this.value('tokenNumber')){this.el('guidedQuestion').textContent='पहले New दबाकर backend से Token Number लें।';return;}
+    if(!tokenServicesReady_){this.el('guidedQuestion').textContent='पहले Reload services दबाएँ।';return;}
+    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';
+    this.lastAuto=this.value('tokenNumber');this.el('guidedTranscript').textContent='';
+    this.ask('phone','आपका फोन नंबर क्या है? दस अंकों का नंबर बोलें।');
+  },
+  ask:function(state,question){
+    if(!this.active)return;
+    this.cancelInput();this.state=state;this.epoch++;
+    var id='g'+this.epoch,self=this;this.promptId=id;
+    this.el('guidedQuestion').textContent=question;this.el('guidedAnswer').value='';
+    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.speakPrompt(question,id);return;}
+    if(window.AndroidVoice&&!window.AndroidVoice.speakPrompt){
+      this.el('guidedQuestion').textContent=question+' (आवाज़ के लिए Android v1.5 install करें; अभी जवाब लिख सकते हैं।)';return;
+    }
+    if(window.speechSynthesis&&typeof SpeechSynthesisUtterance!=='undefined'){
+      var speech=new SpeechSynthesisUtterance(question);speech.lang='hi-IN';speech.rate=0.9;
+      speech.onend=function(){self.promptDone(id);};speech.onerror=function(){self.promptDone(id);};
+      window.speechSynthesis.speak(speech);
+    }else this.promptDone(id);
+  },
+  promptDone:function(id){
+    if(!this.active||this.promptId!==id||this.listening)return;
+    this.promptId='';this.listen();
+  },
+  listen:function(){
+    if(!this.active||document.hidden)return;
+    var self=this,epoch=this.epoch;this.listening=true;
+    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.startRecognition('guided');return;}
+    if(window.AndroidVoice)return;
+    var Recognition=voiceRecognitionClass_();
+    if(!Recognition){this.el('guidedTranscript').textContent='Microphone उपलब्ध नहीं है। नीचे जवाब लिखें।';return;}
+    var recognition=new Recognition();this.recognition=recognition;
+    recognition.lang='hi-IN';recognition.interimResults=true;recognition.continuous=false;
+    recognition.onresult=function(event){
+      if(!self.active||self.epoch!==epoch||!self.listening)return;
+      var text='';for(var i=0;i<event.results.length;i++)text+=event.results[i][0].transcript+' ';
+      self.el('guidedTranscript').textContent=text.trim();
+      if(event.results[event.results.length-1].isFinal)self.receive(text.trim());
+    };
+    recognition.onerror=function(event){if(self.active&&self.epoch===epoch&&event.error!=='no-speech'&&event.error!=='aborted')self.fail('Microphone: '+event.error);};
+    recognition.onend=function(){
+      if(self.active&&self.epoch===epoch&&self.listening){self.recognition=null;self.timer=setTimeout(function(){if(self.active&&self.epoch===epoch)self.listen();},500);}
+    };
+    try{recognition.start();}catch(e){this.fail('Microphone शुरू नहीं हुआ: '+e.message);}
+  },
+  submitTyped:function(){
+    var answer=this.value('guidedAnswer');if(!this.active||this.state==='lookup'||!answer)return;
+    this.cancelInput();this.promptId='';this.listening=true;this.receive(answer);
+  },
+  yesNo:function(text){
+    var s=voiceClean_(String(text).toLowerCase());
+    if(/^(?:हाँ|हां|जी हाँ|जी हां|हां सेव करो|हाँ सेव करो|हां सेव कर दो|हाँ सेव कर दो|सेव करो|yes|yes save|yes save it|haan|han|save|save token|जी)$/.test(s))return true;
+    if(/^(?:नहीं|नही|ना|बस|नहीं और|no|no more|nahi|nahin|bas)$/.test(s))return false;
+    return null;
+  },
+  rows:function(){return getTokenItemsForSave_();},
+  render:function(rows){renderTokenItemsTable(rows);calcTokenTotals();},
+  afterDate:function(){
+    var rows=this.rows();if(rows.length){this.itemIndex=0;this.nextItemField();}else{this.itemIndex=0;this.ask('item','कितने और कौन से कपड़े हैं? जैसे, दो शर्ट वॉश आयरन।');}
+  },
+  nextItemField:function(){
+    var rows=this.rows();
+    for(var i=this.itemIndex;i<rows.length;i++){
+      this.itemIndex=i;var row=rows[i];
+      if(!row.item||!Number.isInteger(Number(row.qty))||Number(row.qty)<=0){this.ask('item','इस कपड़े की सही quantity और नाम बोलें।');return;}
+      if(!row.service){this.ask('service',row.qty+' '+row.item+' के लिए कौन सी service चाहिए? वॉश आयरन, प्रेस, ड्राई क्लीन, किलो या फोल्ड?');return;}
+      if(/^(KG|KG WF)$/.test(row.service)&&!(Number(row.weight)>0)){this.ask('weight',row.qty+' '+row.item+' का कुल वजन कितना है? जैसे तीन किलो चार सौ ग्राम।');return;}
+    }
+    this.ask('more','और कपड़े जोड़ने हैं? हाँ या नहीं बोलें।');
+  },
+  snapshot:function(){return JSON.stringify({phone:this.value('tokenPhone'),name:this.value('tokenCustomerName'),date:this.value('tokenDeliveryDate'),remark:this.value('tokenRemark'),items:this.rows()});},
+  review:function(){
+    var rows=this.rows();
+    if(!/^\d{10}$/.test(this.value('tokenPhone'))){this.ask('phone','सही दस अंकों का फोन नंबर बोलें।');return;}
+    if(!this.value('tokenCustomerName')){this.ask('name','आपका नाम क्या है?');return;}
+    if(!this.value('tokenDeliveryDate')){this.ask('date','डिलीवरी किस तारीख को चाहिए?');return;}
+    if(!rows.length){this.itemIndex=0;this.ask('item','पहले quantity और कपड़े का नाम बोलें।');return;}
+    var bad=rows.findIndex(function(r){return !r.item||!r.service||!Number.isInteger(Number(r.qty))||Number(r.qty)<=0||(/^(KG|KG WF)$/.test(r.service)&&!(Number(r.weight)>0));});
+    if(bad>=0){this.itemIndex=bad;this.nextItemField();return;}
+    var readable=rows.map(function(r){return r.qty+' '+r.item+', '+r.service+(/^(KG|KG WF)$/.test(r.service)?', वजन '+r.weight+' किलो':'');}).join('। ');
+    this.reviewSnapshot=this.snapshot();
+    this.ask('review','जाँच लें। नाम '+this.value('tokenCustomerName')+'। फोन '+this.value('tokenPhone').split('').join(' ')+'। डिलीवरी '+this.value('tokenDeliveryDate')+'। '+readable+'। रिमार्क '+(this.value('tokenRemark')||'नहीं')+'। टोकन सेव कर दूँ? हाँ या नहीं बोलें।');
+  },
+  receive:function(answer){
+    if(!this.active||!this.listening)return;
+    var text=voiceClean_(answer),self=this;if(!text)return;
+    this.cancelInput();this.promptId='';this.el('guidedTranscript').textContent=text;
+    if(/^(stop|cancel|रुको|रुकिए|बंद करो|रद्द करो)$/i.test(text)){this.stop(true);return;}
+    var state=this.state,rows=this.rows(),result;
+    if(state==='phone'){
+      var phoneText=text.replace(/^(?:phone|mobile|फोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?\s*/i,'');
+      var phone=voiceReadPhone_(phoneText);
+      if(!phone.complete&&this.phoneBuffer)phone=voiceReadPhone_(this.phoneBuffer+' '+phoneText);
+      if(!phone.complete){this.phoneBuffer=phone.value.length<10?phone.value:'';this.ask('phone',this.phoneBuffer?'नंबर पूरा नहीं हुआ। बाकी अंक बोलें या पूरा दस अंकों का नंबर दोहराएँ।':'सही दस अंकों का फोन नंबर दोबारा बोलें।');return;}
+      this.phoneBuffer='';this.el('tokenPhone').value=phone.value;this.el('tokenCustomerName').value='';
+      this.state='lookup';this.epoch++;var epoch=this.epoch;
+      this.el('guidedQuestion').textContent='Customer का नाम backend से जाँच रहा है…';
+      this.timer=setTimeout(function(){if(self.active&&self.epoch===epoch)self.fail('Customer lookup में समय लग रहा है। Connection जाँचें।');},20000);
+      google.script.run.withSuccessHandler(function(name){
+        if(!self.active||self.epoch!==epoch||self.value('tokenPhone')!==phone.value)return;
+        if(self.timer){clearTimeout(self.timer);self.timer=null;}
+        if(typeof name==='string'&&name.trim()){self.el('tokenCustomerName').value=name.trim();self.ask('date',name.trim()+' जी, डिलीवरी किस तारीख को चाहिए?');}
+        else self.ask('name','इस नंबर का नाम नहीं मिला। आपका नाम क्या है?');
+      }).withFailureHandler(function(e){if(self.active&&self.epoch===epoch)self.fail('Customer lookup नहीं हुआ: '+(e.message||e));}).getCustomerByPhone(phone.value,getActiveSessionToken());return;
+    }
+    if(state==='name'){
+      var name=text.replace(/^(?:मेरा नाम|नाम|name|my name is)\s*/i,'').replace(/\s+है$/,'').trim();
+      if(!name||/^\d+$/.test(name)){this.ask('name','नाम साफ़ बोलें।');return;}
+      this.el('tokenCustomerName').value=name;this.ask('date','डिलीवरी किस तारीख को चाहिए? जैसे पंद्रह तारीख या पाँच सितंबर दो हजार छब्बीस।');return;
+    }
+    if(state==='date'){
+      var value=voiceDateToIso_(text);
+      if(!value){this.ask('date','तारीख समझ नहीं आई। जैसे पंद्रह तारीख, या पाँच सितंबर 2026 बोलें।');return;}
+      this.el('tokenDeliveryDate').value=value;this.afterDate();return;
+    }
+    if(state==='item'){
+      result=voiceReadItems_(text);var incoming=result.items.filter(function(r){return !voiceIsBlankItem_(r);});
+      if(!incoming.length||incoming.some(function(r){return !r.item||!Number.isInteger(Number(r.qty))||Number(r.qty)<=0;})){this.ask('item','Quantity और कपड़े का नाम बोलें। जैसे दो शर्ट।');return;}
+      // The guide asks the service/weight separately when these were not included.
+      if(result.issues.some(function(issue){return !/^(Select the service|Weight is required)/.test(issue);})){this.ask('item','पूरी item line साफ़ दोहराएँ, जैसे दो शर्ट वॉश आयरन।');return;}
+      rows.splice.apply(rows,[this.itemIndex,this.itemIndex<rows.length?1:0].concat(incoming));this.render(rows);this.nextItemField();return;
+    }
+    if(state==='service'){
+      var service=resolveVoiceService_(text,false);
+      if(!service){this.ask('service','Service समझ नहीं आई। वॉश आयरन, प्रेस, ड्राई क्लीन, किलो या फोल्ड बोलें।');return;}
+      if(!rows[this.itemIndex]){this.ask('item','कपड़े की quantity और नाम दोबारा बोलें।');return;}
+      rows[this.itemIndex].service=service;if(!/^(KG|KG WF)$/.test(service))rows[this.itemIndex].weight=0;
+      this.render(rows);this.nextItemField();return;
+    }
+    if(state==='weight'){
+      var weightText=voiceNumberText_(text).replace(/^(?:वजन|वज़न|weight)\s*/i,'');
+      if(/^\d+(?:\.\d+)?$/.test(weightText))weightText+=' kg';
+      result=voiceReadItems_('1 Weight '+weightText);
+      if(result.items.length!==1||!(result.items[0].weight>0)||result.issues.length){this.ask('weight','वजन दोहराएँ, जैसे तीन किलो चार सौ ग्राम या 3.4 किलो।');return;}
+      if(!rows[this.itemIndex]){this.ask('item','कपड़े की quantity और नाम दोबारा बोलें।');return;}
+      rows[this.itemIndex].weight=result.items[0].weight;this.render(rows);this.nextItemField();return;
+    }
+    if(state==='more'){
+      var more=this.yesNo(text);if(/^(और|aur)$/i.test(text))more=true;
+      if(more===true){this.itemIndex=rows.length;this.ask('item','अगले कपड़े की quantity, नाम और service बोलें।');}
+      else if(more===false)this.ask('remark','कोई रिमार्क या खास निर्देश हैं? नहीं हों तो नहीं बोलें।');
+      else this.ask('more','और कपड़े जोड़ने हैं? हाँ या नहीं बोलें।');return;
+    }
+    if(state==='remark'){this.el('tokenRemark').value=this.yesNo(text)===false?'':text;this.review();return;}
+    if(state==='review'){
+      var yes=this.yesNo(text);
+      if(yes===true){
+        if(this.snapshot()!==this.reviewSnapshot){this.review();return;}
+        this.suppressAutoOnce=true;this.stop(false);this.el('guidedQuestion').textContent='आपकी पुष्टि मिली। Token backend में save किया जा रहा है…';saveTokenBooking();
+      }else if(yes===false){this.stop(false);this.el('guidedQuestion').textContent='Token save नहीं हुआ। Manual form में सुधार करें, फिर Save Token दबाएँ या बातचीत फिर शुरू करें।';}
+      else this.ask('review','टोकन सेव करना है? केवल हाँ या नहीं बोलें।');
+    }
+  }
+};
+window.onAndroidGuidedPromptDone=function(id){guidedVoice_.promptDone(id);};
+window.onAndroidGuidedPartial=function(text){if(guidedVoice_.active&&guidedVoice_.listening)guidedVoice_.el('guidedTranscript').textContent=String(text||'');};
+document.addEventListener('visibilitychange',function(){if(document.hidden&&guidedVoice_.active)guidedVoice_.stop(true);});
+</script>
 </body>
 </html>
