@@ -591,7 +591,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.7</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.8</small></h2>
     <div id="tokenBackendStatus" class="info" role="status"></div>
     <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
     <div class="voice-token-panel" id="customerVoicePanel">
@@ -1092,7 +1092,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function normalizeVoiceAliases_(text){
       var value = String(text||'').replace(/(\d)(?=kgs?\b)/gi,'$1 ');
       var aliases = [
-        [/\b(?:w|dablu|dabloo|dab[lw]oo|double\s*u)\s*\.?\s*(?:i|aai|ai|eye)\b|(?:डब्ल्यू|डब्लू|डबल्यू|डबलू|डबल यू|डब्ल्यु|डबल्यु)\s*(?:आई|आइ)/gi,'WI'],
+        [/\b(?:w|dablu|dabloo|dab[lw]oo|double\s*u)\s*\.?\s*(?:i|aai|ai|eye)\b|(?:डब्ल्यू|डब्लू|डबल्यू|डबलू|डबल यू|डब्ल्यु|डबल्यु)\s*(?:आई|आइ|ई)/gi,'WI'],
         [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
         [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?fold(?:ing)?\b|(?:वॉश|वाश|वॉस)\s*(?:(?:एंड|एण्ड|और|&)\s*)?फोल्ड/gi,'WF'],
         [/\b(?:narso|narson|nurso)\b|नरसों|नरसो/gi,'narso'],
@@ -1102,6 +1102,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:dho\s*(?:ke|kar)|dhoke|dhokar)\s*(?:(?:phir|fir)\s*)?(?:press|pres|iron|istri|istree)(?:\s+(?:karna|karo|kar\s*do|kar\s*dena))?\b/gi,'WI'],
         [/(?:धो\s*(?:के|कर(?:के)?)|धुलाई\s*(?:करके|कर\s*के|के\s*बाद))\s*(?:फिर\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
         [/(?:वॉश|वाश|वास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
+        // Standalone shortcuts come AFTER the complete washing combinations.
+        [/\bwash\b|वॉश|वाश/gi,'WI'],
+        [/\bfold\b|फोल्ड/gi,'WF'],
         [/\b(?:d\s*c|dry\s*clean(?:ing)?)\b|डी\s*सी|ड्राई\s*क्लीन(?:िंग)?/gi,'DC'],
         // Washing combinations above must take precedence over standalone ironing.
         [/\bi\s*\.?\s*r\b|आई\s*आर/gi,'IR'],
@@ -1289,6 +1292,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));
           item=body.slice(0,serviceMatch.index).trim();
           var after=voiceClean_(serviceMatch[2]).replace(/^(?:hai|hain|है|हैं)\s*/i,'');
+          if(/^(?:WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:WI|WF|DC|IR|SH|BLK|KG))*$/i.test(after)){
+            serviceMatch[1]=after.trim().split(/\s+/).pop();
+            service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));after='';
+          }
           if(/^kg$/i.test(serviceMatch[1])){
             var beforeWeight=item.match(/\s+(\d+(?:\.\d+)?)$/);
             var afterWeight=after.match(/^(?:(?:weight|वजन|वज़न|वेट)\s*[:\-]?\s*)?(\d+(?:\.\d+)?)(?:\s*kg)?/i);
@@ -1416,9 +1423,24 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(!tokenVoiceDraft_)beginVoiceTokenDraft_();
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
       if(tokenVoiceScope_==='items'){
+        var command=voiceClean_(normalizeVoiceAliases_(text)).replace(/^(?:service|सर्विस|सेवा)\s+/i,'').trim();
+        if(/^(?:WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:WI|WF|DC|IR|SH|BLK|KG))*$/i.test(command)){
+          var code=command.split(/\s+/).pop().toUpperCase(),selected=resolveVoiceService_(code,code==='KG'),target=base.items.length-1;
+          while(target>=0&&!base.items[target].item)target--;
+          data.items=[];data.issues=[];data.pending=null;
+          if(target<0)data.issues=['पहले quantity और item भरें, फिर service बोलें।'];
+          else if(!selected)data.issues=['Service '+code+' उपलब्ध नहीं है। Reload services दबाएँ।'];
+          else{
+            base=Object.assign({},base,{items:base.items.map(function(row){return Object.assign({},row);})});
+            base.items[target].service=selected;
+            if(code!=='KG')base.items[target].weight=0;
+            else if(!(Number(base.items[target].weight)>0))data.issues=['KG चुना गया। अब वजन बोलें, जैसे 3 किलो 400 ग्राम।'];
+          }
+        }
         var weightOnly=voiceNumberText_(normalizeVoiceAliases_(text)).replace(/(\d)\s+(?:hundred|सौ)(?=\s|$)/gi,function(_,n){return String(Number(n)*100);}).trim();
         if(/^(?:kg\s+)?\d+(?:\.\d+)?\s*kg(?:\s+\d+(?:\.\d+)?\s*(?:grams?|gm|g|ग्राम))?(?:\s+kg)*$/i.test(weightOnly)){
           var weightResult=voiceReadItems_('1 Weight '+weightOnly),last=base.items.length-1;
+          while(last>=0&&!base.items[last].item)last--;
           if(last>=0&&base.items[last].item&&weightResult.items.length===1&&weightResult.items[0].weight>0){
             base=Object.assign({},base,{items:base.items.map(function(row){return Object.assign({},row);})});
             base.items[last].service=resolveVoiceService_('KG',true);base.items[last].weight=weightResult.items[0].weight;
