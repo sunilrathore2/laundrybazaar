@@ -595,7 +595,7 @@
         <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
         <span id="voiceTokenStatus" class="info">Hindi, English and Hinglish supported.</span>
       </div>
-      <div id="voiceTokenTranscript">Say customer name, phone and delivery date, then Quantity–Item–Service: “2 shirt WI, 3 pant WF, 1 blazer DC”. Hindi item names supported: “दो सूती साड़ी DC”, “एक लहंगा तीन अस्तर DC”, “दो शर्ट धो के प्रेस करना”. Mention single/double, plain/fancy or material when needed. Add remark if needed. Enter rates later in Book Order.</div>
+      <div id="voiceTokenTranscript">बोलें: फोन 9876543210, नाम सुनील, डिलीवरी डेट 5 सितंबर 2026, 5 शर्ट वॉश एंड आयरन और 2 शर्ट DC और 2 ब्लैंकेट 4.2 केजी। “और” = नई row। अंत में जाँचकर Save Token दबाएँ या “टोकन सेव करो” बोलें।</div>
     </div>
     <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly><button class="btn" onclick="newToken()">New</button></div>
     <div class="form-row"><label>Token Date:</label><input type="date" id="tokenDate"></div>
@@ -853,14 +853,16 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function lookupTokenCustomer(){
       const p = document.getElementById('tokenPhone').value.trim();
       if(/^\d{10}$/.test(p)){
+        const nameAtRequest=document.getElementById('tokenCustomerName').value;
         google.script.run.withSuccessHandler(function(n){
-          if(n) document.getElementById('tokenCustomerName').value=n;
+          if(n && document.getElementById('tokenPhone').value.trim()===p && document.getElementById('tokenCustomerName').value===nameAtRequest) document.getElementById('tokenCustomerName').value=n;
         }).getCustomerByPhone(p, getActiveSessionToken());
       }
     }
 
     function newToken(){
       google.script.run.withSuccessHandler(function(n){
+        tokenVoicePending_=null;tokenVoiceDraft_=null;tokenVoiceActive_=false;
         document.getElementById('tokenNumber').value = n;
         document.getElementById('tokenDate').value = new Date().toISOString().slice(0,10);
         document.getElementById('tokenCustomerName').value = '';
@@ -877,13 +879,15 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function saveTokenBooking(){
-      const items = getTokenItems();
+      if(document.getElementById('saveTokenBtn').disabled)return;
+      stopVoiceToken();
+      const items = getTokenItemsForSave_();
       const obj = {
         tokenNumber: document.getElementById('tokenNumber').value,
         tokenDate: document.getElementById('tokenDate').value,
         customerName: document.getElementById('tokenCustomerName').value.trim(),
         phone: document.getElementById('tokenPhone').value.trim(),
-        quantity: document.getElementById('tokenQuantity').value,
+        quantity: items.reduce(function(sum,it){return sum+Number(it.qty||0);},0),
         deliveryDate: document.getElementById('tokenDeliveryDate').value,
         totalAmount: 0, // Compatibility with the existing token backend; pricing starts in Book Order.
         items: items,
@@ -892,8 +896,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(!obj.customerName) return alert('Customer Name required.');
       if(!/^\d{10}$/.test(obj.phone)) return alert('Phone must be exactly 10 digits.');
       if(!obj.deliveryDate) return alert('Delivery Date required.');
-      if(!items.length || items.some(function(it){ return !it.service || !it.item || Number(it.qty)<=0; })) {
-        return alert('Enter valid Service, Item and Quantity.');
+      if(!items.length || items.some(function(it){ return !it.service || !it.item || !Number.isInteger(Number(it.qty)) || Number(it.qty)<=0 || (it.service==='KG' && !(Number(it.weight)>0)); })) {
+        return alert('Enter valid Service, Item and Quantity; enter Weight for KG items.');
       }
 
       document.getElementById('saveTokenBtn').disabled = true;
@@ -930,10 +934,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var html = '<table><thead><tr><th>Qty</th><th>Item</th><th>Service</th><th></th></tr></thead><tbody>';
       items.forEach(function(it, i){
         var options = serviceOptions.map(function(opt){
-          return '<option '+(String(it.service||'').trim().toLowerCase()===String(opt||'').trim().toLowerCase()?'selected':'')+'>'+escapeHtml(opt)+'</option>';
+          return '<option value="'+escapeHtml(opt)+'" '+(String(it.service||'').trim().toLowerCase()===String(opt||'').trim().toLowerCase()?'selected':'')+'>'+escapeHtml(opt)+'</option>';
         }).join('');
         html += '<tr class="tokenItemRow">'+
-          '<td><input class="token-qty" type="number" min="1" step="1" value="'+(Number(it.qty)||1)+'" oninput="calcTokenItemRow(this)"></td>'+
+          '<td><input class="token-qty" type="number" min="1" step="1" value="'+(it.qty == null ? 1 : Number(it.qty))+'" oninput="calcTokenItemRow(this)"></td>'+
           '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"></div></td>'+
           '<td><select class="token-service" onchange="handleTokenServiceChange(this)"><option value="">Select</option>'+options+'</select></td>'+
           '<td>'+(items.length>1?'<button class="btn token-remove-item" type="button" onclick="removeTokenItemRow('+i+')">&times;</button>':'')+'</td></tr>';
@@ -974,7 +978,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function calcTokenTotals(){
       var qty = 0;
       document.querySelectorAll('.tokenItemRow').forEach(function(row){
-        qty += Number(row.querySelector('.token-qty').value)||0;
+        if(row.querySelector('.token-item').value.trim() || row.querySelector('.token-service').value) qty += Number(row.querySelector('.token-qty').value)||0;
       });
       document.getElementById('tokenQuantity').value = qty;
     }
@@ -984,6 +988,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function stopVoiceToken(){
+      if(tokenVoiceActive_ && tokenVoiceLastParsed_)tokenVoicePending_=tokenVoiceLastParsed_.pending;
+      tokenVoiceActive_=false;tokenVoiceDraft_=null;
       if(voiceTokenRecognition) try{ voiceTokenRecognition.abort(); } catch(e){}
       if(voiceTokenConfirmRecognition) try{ voiceTokenConfirmRecognition.abort(); } catch(e){}
       if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')) {
@@ -1004,6 +1010,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       
       if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')){
         stopVoiceToken();
+        beginVoiceTokenDraft_();
         document.getElementById('voiceTokenBtn').disabled = true;
         document.getElementById('voiceTokenStopBtn').disabled = false;
         status.textContent = 'Connecting to Android microphone...';
@@ -1013,6 +1020,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       
       if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function'){
         stopVoiceToken();
+        beginVoiceTokenDraft_();
         document.getElementById('voiceTokenBtn').disabled = true;
         document.getElementById('voiceTokenStopBtn').disabled = false;
         status.textContent = 'Connecting to Android microphone...';
@@ -1029,6 +1037,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       }
       
       stopVoiceToken();
+      beginVoiceTokenDraft_();
       document.getElementById('voiceTokenBtn').disabled = true;
       document.getElementById('voiceTokenStopBtn').disabled = false;
       status.textContent = 'Listening... Speak Hindi, English or Hinglish.';
@@ -1037,16 +1046,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         var recognition = new Recognition();
         voiceTokenRecognition = recognition;
         recognition.lang = 'hi-IN';
-        recognition.interimResults = false;
+        recognition.interimResults = true;
         recognition.maxAlternatives = 3;
         
         recognition.onresult = function(event){
-          var alternatives = event.results[event.results.length - 1];
-          var primary = alternatives[0].transcript;
-          document.getElementById('voiceTokenTranscript').textContent = primary;
-          var parsed = parseVoiceToken_(primary);
-          fillVoiceTokenForm_(parsed);
-          if(parsed.items.length) confirmVoiceToken_(primary);
+          var text='';for(var i=0;i<event.results.length;i++)text+=event.results[i][0].transcript+' ';
+          applyVoiceTokenSpeech_(text.trim(),event.results[event.results.length-1].isFinal);
         };
         
         recognition.onerror = function(event){
@@ -1101,7 +1106,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:paint|pent|paant)\b|पेंट|पैंट/gi,'pant'],
         [/\b(?:jin|jins|jean)\b|जीन्स|जींस|जीन/gi,'jeans'],
         [/\b(?:blezer|blazer)\b|ब्लेजर/gi,'blazer'],
-        [/\b(?:blankit|blanket)\b|ब्लैंकेट|कंबल/gi,'blanket'],
+        [/\b(?:blankit|blanket)\b|ब्लैंकेट|ब्लेंकेट|ब्लैन्केट|कंबल/gi,'blanket'],
         [/\b(?:rupya|rupye|rupaye|rupees?)\b|रुपया|रुपये/gi,'rupees'],
         [/\b(?:ret|rait)\b|रेट/gi,'rate'],
         [/\b(?:fon|fone)\b|फ़ोन|फोन/gi,'phone'],
@@ -1111,22 +1116,6 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       return value.replace(/\s+/g,' ').trim();
     }
 
-    function voiceDateToIso_(text){
-      var t = normalizeVoiceDigits_(normalizeVoiceAliases_(text)).toLowerCase();
-      var d = new Date();
-      if(/narso/.test(t)) d.setDate(d.getDate()+3);
-      else if(/day after tomorrow|parso|परसों/.test(t)) d.setDate(d.getDate()+2);
-      else if(/tomorrow|कल/.test(t)) d.setDate(d.getDate()+1);
-      else {
-        var m = t.match(/(?:delivery|date|डिलीवरी|तारीख)\s*(?:date|की तारीख)?\s*(\d{1,2})[\s\/\-.]+(\d{1,2})(?:[\s\/\-.]+(\d{2,4}))?/i);
-        if(m){
-          var year = Number(m[3]||d.getFullYear());
-          if(year < 100) year += 2000;
-          d = new Date(year, Number(m[2])-1, Number(m[1]));
-        }
-      }
-      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    }
 
     function resolveVoiceService_(spoken, isKg){
       var cleaned = normalizeVoiceAliases_(spoken).toLowerCase().replace(/\b(ki|ka|ke|me|mein|service|hai|hain)\b|की|का|के|में|सर्विस|हैं|है/g,' ').replace(/\s+/g,' ').trim();
@@ -1183,7 +1172,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       });
       text=text.replace(/\b(?:ka|ki|ke|wala|wali|wale)\b|(?:का|की|के|वाला|वाली|वाले)/g,' ').replace(/\s+/g,' ').trim();
       function has(word){return (' '+text+' ').indexOf(' '+word+' ')>=0;}
-      if(has('shirt')||has('tshirt')) return 'Shirt/Tshirt';
+      if(has('tshirt')) return 'Tshirt';
+      if(has('shirt')) return 'Shirt';
       if(has('trouser')||has('jeans')) return 'Trouser/Jeans';
       if(has('coat')) return has('half')?'Half-Coat':has('full')?'Full-Coat':'Coat';
       if(has('suit')) return has('3')&&has('pcs')?'Suit 3 Pcs':has('2')&&has('pcs')?'Suit 2 Pcs':'Suit';
@@ -1206,67 +1196,188 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       return original; // Keep unknown garments editable; never guess a priced variant.
     }
 
-    function parseNaturalVoiceItems_(text){
-      // A service ends each Quantity–Item–Service row, even without commas.
-      var alternatives = ['WI','WF','DC','KG','wash iron','wash & iron','wash fold','dry clean','dry cleaning'].concat(serviceOptions);
-      alternatives = alternatives.filter(Boolean).sort(function(a,b){ return b.length-a.length; }).map(function(x){ return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); });
-      var pattern = new RegExp('(?:^|[\\s,;।])(?:quantity\\s+|qty\\s+|मात्रा\\s+)?(\\d+(?:\\.\\d+)?)\\s+(?:item\\s+|आइटम\\s+)?([^,;।]+?)\\s+(?:service\\s+|सेवा\\s+)?('+alternatives.join('|')+')(?=$|[\\s,;।.])(?:\\s+(?:weight|वजन)\\s+(\\d+(?:\\.\\d+)?))?', 'gi');
-      var rows = [], m;
-      while((m = pattern.exec(text)) !== null){
-        var item = m[2].replace(/\s+(?:hai|hain|ki|ka|ke|है|हैं|की|का|के)\s*$/i,'').trim();
-        if(!item || Number(m[1])<=0) continue;
-        var service = resolveVoiceService_(m[3], /^kg$/i.test(m[3]));
-        rows.push({service:service,item:normalizeVoiceItem_(item),qty:Number(m[1]),weight:Number(m[4])||0,rate:0,amt:0});
-      }
-      return rows;
+
+
+
+    function voiceClean_(value){
+      return String(value||'').replace(/^[\s,:;।.\-]+|[\s,:;।.\-]+$/g,'').trim();
     }
 
-    function parseVoiceToken_(speech){
-      var text = normalizeVoiceDigits_(normalizeVoiceAliases_(speech)).replace(/\s+/g,' ').trim();
-      var lower = text.toLowerCase();
-      var phoneMatch = text.match(/(?:phone|mobile|number|फोन|मोबाइल|नंबर)\s*[:\-]?\s*((?:\d[\s-]*){10})/i) || text.match(/((?:\d[\s-]*){10})/);
-      var phone = phoneMatch ? phoneMatch[1].replace(/\D/g,'').slice(-10) : '';
-      var nameMatch = text.match(/(?:name|naam|नाम)\s*[:\-]?\s*(.+?)(?=\s+(?:phone|mobile|number|फोन|मोबाइल|नंबर|delivery|डिलीवरी|service|सेवा|item|आइटम|remark|रिमार्क|$))/i);
-      var name = nameMatch ? nameMatch[1].trim() : '';
-      if(!name && phoneMatch && typeof phoneMatch.index === 'number') {
-        name = text.slice(0, phoneMatch.index).replace(/^[,.;\s]+|[,.;\s]+$/g,'').replace(/^(customer|ग्राहक)\s+/i,'').replace(/(?:phone|mobile|फोन|मोबाइल)\s*$/i,'').trim();
+    function voiceNumberText_(value){
+      var text = String(value||'').replace(/[०-९]/g,function(d){return String('०१२३४५६७८९'.indexOf(d));});
+      var singles={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9};
+      var tens={twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+      text=text.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[ -]+(one|two|three|four|five|six|seven|eight|nine)\b/gi,function(_,t,s){return String(tens[t.toLowerCase()]+singles[s.toLowerCase()]);});
+      var words={zero:0,oh:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,ek:1,do:2,teen:3,char:4,chaar:4,panch:5,paanch:5,chhe:6,che:6,saat:7,aath:8,nau:9,das:10,'शून्य':0,'जीरो':0,'एक':1,'दो':2,'तीन':3,'चार':4,'पांच':5,'पाँच':5,'छह':6,'छः':6,'सात':7,'आठ':8,'नौ':9,'दस':10,'ग्यारह':11,'बारह':12,'तेरह':13,'चौदह':14,'पंद्रह':15,'पन्द्रह':15,'सोलह':16,'सत्रह':17,'अठारह':18,'उन्नीस':19,'बीस':20,'इक्कीस':21,'बाईस':22,'तेईस':23,'चौबीस':24,'पच्चीस':25,'छब्बीस':26,'सत्ताईस':27,'अट्ठाईस':28,'अट्ठाइस':28,'उनतीस':29,'तीस':30,'इकतीस':31};
+      text=text.replace(/[A-Za-z\u0900-\u097F]+/g,function(w){return Object.prototype.hasOwnProperty.call(words,w.toLowerCase())?String(words[w.toLowerCase()]):w;});
+      text=text.replace(/\b2\s+(?:thousand|hazar|हजार|हज़ार)\s+(\d{1,2})\b/gi,function(_,n){return String(2000+Number(n));});
+      text=text.replace(/(\d+)\s*(?:point|decimal|पॉइंट|प्वाइंट|दशमलव)\s*(\d+)(?:\s+(\d)(?=\s*(?:kg|किलो|केजी)))?/gi,function(_,a,b,c){return a+'.'+b+(c||'');});
+      return text;
+    }
+
+    function voiceReadDate_(input, reference){
+      var text=voiceNumberText_(input).replace(/^\s*(?:date|डेट|तारीख)\s*[:\-]?\s*/i,'');
+      var months={january:1,jan:1,'जनवरी':1,janvari:1,february:2,feb:2,'फरवरी':2,'फ़रवरी':2,farvari:2,march:3,mar:3,'मार्च':3,april:4,apr:4,'अप्रैल':4,may:5,'मई':5,june:6,jun:6,'जून':6,july:7,jul:7,'जुलाई':7,august:8,aug:8,'अगस्त':8,september:9,sep:9,sept:9,'सितंबर':9,'सितम्बर':9,sitambar:9,sitamber:9,october:10,oct:10,'अक्टूबर':10,november:11,nov:11,'नवंबर':11,'नवम्बर':11,december:12,dec:12,'दिसंबर':12,'दिसम्बर':12};
+      var today=reference||new Date(),match,day,month,year,end=0;
+      var monthNames=Object.keys(months).sort(function(a,b){return b.length-a.length;}).join('|');
+      match=text.match(new RegExp('^\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+('+monthNames+')(?:\\s+(\\d{4}|\\d{2})(?=\\s|$|[,;।]))?','i'));
+      if(match){day=Number(match[1]);month=months[match[2].toLowerCase()];year=match[3]?Number(match[3]):today.getFullYear();end=match[0].length;}
+      else if((match=text.match(/^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?=\s|$|[,;।])/))){year=Number(match[1]);month=Number(match[2]);day=Number(match[3]);end=match[0].length;}
+      else if((match=text.match(/^\s*(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?=\s|$|[,;।])/)) || (match=text.match(/^\s*(\d{1,2})\s+(\d{1,2})\s+(\d{4})(?=\s|$|[,;।])/))){day=Number(match[1]);month=Number(match[2]);year=Number(match[3]);end=match[0].length;}
+      else if((match=text.match(/^\s*(day after tomorrow|tomorrow|today|narso|parso|kal|aaj|परसों|परसो|नरसों|नरसो|कल|आज)(?=\s|$|[,;।])/i))){
+        var word=match[1].toLowerCase(),delta=/narso|नरसो|नरसों/.test(word)?3:/parso|परसो|परसों|day after/.test(word)?2:/tomorrow|kal|कल/.test(word)?1:0;
+        var date=new Date(today.getFullYear(),today.getMonth(),today.getDate()+delta);day=date.getDate();month=date.getMonth()+1;year=date.getFullYear();end=match[0].length;
       }
-      var remarkMatch = text.match(/(?:remark|remarks|note|रिमार्क|टिप्पणी)\s*[:\-]?\s*(.+)$/i);
-      // Exclude phone, date and remarks so their numbers cannot become garments.
-      var itemText = remarkMatch ? text.slice(0, remarkMatch.index) : text;
-      itemText = itemText.replace(/(?:phone|mobile|number|फोन|मोबाइल|नंबर)\s*[:\-]?\s*(?:\d[\s-]*){10}/gi,' ');
-      itemText = itemText.replace(/(?:delivery|date|डिलीवरी|तारीख)\s*(?:date|की तारीख)?\s*\d{1,2}[\s\/\-.]+\d{1,2}(?:[\s\/\-.]+\d{2,4})?/gi,' ');
-      var items = parseNaturalVoiceItems_(itemText);
-      if(!items.length){
-        // Also accept the older labeled format; any spoken rate is ignored.
-        var pattern = /(?:service|सेवा)\s+(.+?)\s+(?:item|आइटम)\s+(.+?)\s+(?:(?:rate|रेट)\s+\d+(?:\.\d+)?\s+)?(?:quantity|qty|मात्रा|क्वांटिटी)\s+(\d+(?:\.\d+)?)(?:\s+(?:weight|वजन)\s+(\d+(?:\.\d+)?))?/gi;
-        var m;
-        while((m=pattern.exec(itemText)) !== null){
-          items.push({service:resolveVoiceService_(m[1],/^kg$/i.test(m[1])),item:normalizeVoiceItem_(m[2]),qty:Number(m[3]),weight:Number(m[4])||0,rate:0,amt:0});
+      if(!end)return {value:'',rest:text,consumed:false,error:voiceClean_(text)?'Delivery date not understood. Say: 5 September 2026.':''};
+      if(year<100)year+=2000;
+      var checked=new Date(year,month-1,day);
+      var valid=year>=2000 && year<=2199 && checked.getFullYear()===year && checked.getMonth()===month-1 && checked.getDate()===day;
+      return {value:valid?year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0'):'',rest:text.slice(end),consumed:true,error:valid?'':'Invalid delivery date. Please correct it.'};
+    }
+
+    function voiceDateToIso_(text){return voiceReadDate_(String(text||'').replace(/^\s*(?:delivery\s*(?:date)?|डिलीवरी\s*(?:डेट|तारीख)?|date|तारीख)\s*[:\-]?\s*/i,'')).value;}
+
+    function voiceBlankItem_(){return {service:'',item:'',qty:0,weight:0,rate:0,amt:0};}
+    function voiceIsBlankItem_(item){return !item.item && !item.service && !Number(item.weight) && (!Number(item.qty)||Number(item.qty)===1);}
+
+    function voiceReadItems_(input){
+      // Normalize the service before splitting "and": wash AND iron stays one service.
+      var text=voiceNumberText_(normalizeVoiceAliases_(input)).replace(/\b(?:quantity|qty|item|service)\s*[:\-]?\s*|(?:आइटम|मात्रा|सर्विस|सेवा)\s*[:\-]?\s*/gi,' ');
+      var serviceNames=['WI','WF','DC','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
+      var services=serviceNames.join('|'),rows=[],issues=[];
+      // A completed service may also delimit adjacent rows without a spoken "और".
+      text=text.replace(new RegExp('('+services+')\\s+(?=\\d+\\s+[^\\d])','gi'),'$1 ; ');
+      var chunks=text.split(/(?:^|\s)(?:और|aur|and)(?=\s|$)|[,;।\n]/i);
+      var leading=/^\s*(?:और|aur|and)(?=\s|$)/i.test(text),trailing=/(?:^|\s)(?:और|aur|and)\s*$/i.test(text);
+      chunks.forEach(function(chunk){
+        chunk=voiceClean_(chunk);if(!chunk)return;
+        var qtyMatch=chunk.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+        if(!qtyMatch){issues.push('Incomplete item: '+chunk);return;}
+        var qty=Number(qtyMatch[1]),body=qtyMatch[2],service='',weight=0,item=body;
+        var serviceMatch=body.match(new RegExp('\\s+('+services+')(?=\\s|$)(.*)$','i'));
+        if(serviceMatch){
+          service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));
+          item=body.slice(0,serviceMatch.index).trim();
+          var after=voiceClean_(serviceMatch[2]).replace(/^(?:hai|hain|है|हैं)\s*/i,'');
+          if(/^kg$/i.test(serviceMatch[1])){
+            var beforeWeight=item.match(/\s+(\d+(?:\.\d+)?)$/);
+            var afterWeight=after.match(/^(?:weight|वजन|वज़न|वेट)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i);
+            if(beforeWeight){weight=Number(beforeWeight[1]);item=item.slice(0,beforeWeight.index);}
+            else if(afterWeight){weight=Number(afterWeight[1]);after=after.slice(afterWeight[0].length);}
+            if(!(weight>0))issues.push('Weight is required for KG item: '+item);
+          }
+          if(voiceClean_(after)&&! /^(?:hai|hain|है|हैं|करना|करो|karna|karo)$/i.test(voiceClean_(after)))issues.push('Check extra item words: '+after);
+        }
+        item=item.replace(/\s+(?:hai|hain|ki|ka|ke|है|हैं|की|का|के)\s*$/i,'').trim();
+        if(!Number.isInteger(qty)||qty<=0)issues.push('Quantity must be a positive whole number.');
+        if(!service)issues.push('Select the service for: '+item);
+        rows.push({service:service,item:normalizeVoiceItem_(item),qty:qty,weight:weight,rate:0,amt:0});
+      });
+      if(trailing)rows.push(voiceBlankItem_());
+      return {items:rows,issues:issues,leadingSeparator:leading};
+    }
+
+    function parseNaturalVoiceItems_(text){return voiceReadItems_(text).items;}
+
+    function voiceReadPhone_(input){
+      var text=voiceNumberText_(input).replace(/^\s*(?:number|नंबर|नम्बर)\s*/i,'').trim(),phone='',end=0;
+      text=text.replace(/^\+91[\s-]*/, '');
+      var compact=text.match(/^(\d{10,})(?=\s|$|[,;।])/);
+      if(compact){phone=compact[1];end=compact[0].length;if(phone.length===12&&phone.slice(0,2)==='91')phone=phone.slice(2);}
+      else {
+        var tokens=/\d+/g,m;while((m=tokens.exec(text))!==null){
+          if(/[^\s-]/.test(text.slice(end,m.index)))break;
+          phone+=m[0];end=tokens.lastIndex;if(phone.length>=10)break;
         }
       }
-      return {name:name, phone:phone, deliveryDate:voiceDateToIso_(lower), remark:remarkMatch?remarkMatch[1].trim():'', items:items};
+      return {value:phone,rest:text.slice(end),complete:/^\d{10}$/.test(phone),error:phone.length>10?'Phone must be exactly 10 digits.':''};
     }
 
-    function fillVoiceTokenForm_(data){
-      if(data.name) document.getElementById('tokenCustomerName').value = capitalizeWords(data.name);
-      if(data.phone) document.getElementById('tokenPhone').value = data.phone;
-      if(data.deliveryDate) document.getElementById('tokenDeliveryDate').value = data.deliveryDate;
-      if(data.remark) document.getElementById('tokenRemark').value = data.remark;
-      if(data.items && data.items.length) renderTokenItemsTable(data.items);
-      else {
-        document.getElementById('voiceTokenStatus').textContent = 'No items understood. Say: 2 shirt WI, 3 pant WF. Check the table before saving.';
-        document.getElementById('voiceTokenBtn').disabled = false;
-        document.getElementById('voiceTokenStopBtn').disabled = true;
-      }
+    function parseVoiceToken_(speech, pending){
+      var raw=String(speech||'').trim(),result={name:'',phone:'',deliveryDate:'',remark:'',items:[],issues:[],pending:null,fields:{},saveRequested:false};
+      var labels=/(^|[\s,;।])((?:delivery\s*(?:date)?|डिलीवरी\s*(?:डेट|तारीख)?|डिलिवरी\s*(?:डेट|तारीख)?)|(?:phone|mobile|फोन|फ़ोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?|(?:customer\s*name|name|naam|नाम)|(?:remark|remarks|note|रिमार्क|टिप्पणी))\s*[:\-]?\s*/gi;
+      if(pending && !/^(?:phone|mobile|फोन|फ़ोन|मोबाइल|नाम|name|naam|delivery|डिलीवरी|डिलिवरी|remark|रिमार्क)(?=\s|:|$)/i.test(raw))raw=pending.field+' '+(pending.text||'')+' '+raw;
+      var save=raw.match(/(?:^|\s)(?:save\s+token|token\s+save|टोकन\s+सेव(?:\s+(?:करो|करना|कर\s*दो))?)\s*[.!।]?$/i);
+      if(save){result.saveRequested=true;raw=raw.slice(0,save.index);}
+      var spans=[],m;while((m=labels.exec(raw))!==null){spans.push({label:m[2],start:m.index,end:labels.lastIndex});if(/^(remark|remarks|note|रिमार्क|टिप्पणी)$/i.test(m[2]))break;}
+      var itemParts=[];
+      if(!spans.length)itemParts.push(raw);
+      else if(voiceClean_(raw.slice(0,spans[0].start)))itemParts.push(raw.slice(0,spans[0].start));
+      spans.forEach(function(span,index){
+        var body=raw.slice(span.end,index+1<spans.length?spans[index+1].start:raw.length),label=span.label.toLowerCase();
+        if(/^(phone|mobile|फोन|फ़ोन|मोबाइल)/.test(label)){
+          result.fields.phone=true;var phone=voiceReadPhone_(body);result.phone=phone.value;
+          if(phone.error)result.issues.push(phone.error);
+          if(!phone.complete&&!voiceClean_(phone.rest))result.pending={field:'phone',text:phone.value};
+          if(voiceClean_(phone.rest)&&! /^(और|aur|and)$/i.test(voiceClean_(phone.rest)))itemParts.push(phone.rest);
+        }else if(/^(delivery|डिलीवरी|डिलिवरी)/.test(label)){
+          result.fields.deliveryDate=true;var date=voiceReadDate_(body);result.deliveryDate=date.value;
+          if(date.error)result.issues.push(date.error);
+          if(date.consumed){if(voiceClean_(date.rest)&&! /^(और|aur|and)$/i.test(voiceClean_(date.rest)))itemParts.push(date.rest);}
+          else result.pending={field:'delivery date',text:voiceClean_(body)};
+        }else if(/^(remark|remarks|note|रिमार्क|टिप्पणी)/.test(label)){
+          result.fields.remark=true;result.remark=voiceClean_(body);
+        }else{
+          result.fields.name=true;
+          var start=body.search(/(?:^|\s)(?:\d+|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten)\s+/i);
+          result.name=voiceClean_(start>=0?body.slice(0,start):body).replace(/\s+(?:और|aur|and)$/i,'').trim();
+          if(start>=0)itemParts.push(body.slice(start));
+          if(!result.name)result.pending={field:'name',text:''};
+        }
+      });
+      var parsed=voiceReadItems_(itemParts.join(' '));result.items=parsed.items;result.issues=result.issues.concat(parsed.issues);result.leadingSeparator=parsed.leadingSeparator;
+      return result;
+    }
+
+    var tokenVoiceDraft_=null,tokenVoicePending_=null,tokenVoiceActive_=false,tokenVoiceLastParsed_=null;
+    function getTokenItemsForSave_(){return getTokenItems().filter(function(it){return !voiceIsBlankItem_(it);});}
+    function beginVoiceTokenDraft_(){
+      tokenVoiceActive_=true;
+      tokenVoiceLastParsed_=null;
+      tokenVoiceDraft_={items:getTokenItems(),name:document.getElementById('tokenCustomerName').value,phone:document.getElementById('tokenPhone').value,deliveryDate:document.getElementById('tokenDeliveryDate').value,remark:document.getElementById('tokenRemark').value,pending:tokenVoicePending_};
+    }
+    function mergeVoiceItems_(base, incoming){
+      var rows=base.map(function(it){return Object.assign({},it);});
+      incoming.forEach(function(it){
+        if(rows.length&&voiceIsBlankItem_(rows[rows.length-1])){
+          if(!voiceIsBlankItem_(it))rows[rows.length-1]=Object.assign({},it);
+        }else rows.push(Object.assign({},it));
+      });
+      return rows;
+    }
+    function fillVoiceTokenForm_(data, base){
+      base=base||{items:getTokenItems(),name:document.getElementById('tokenCustomerName').value,phone:document.getElementById('tokenPhone').value,deliveryDate:document.getElementById('tokenDeliveryDate').value,remark:document.getElementById('tokenRemark').value};
+      document.getElementById('tokenCustomerName').value=data.fields.name?data.name:base.name;
+      document.getElementById('tokenPhone').value=data.fields.phone?data.phone:base.phone;
+      document.getElementById('tokenDeliveryDate').value=data.deliveryDate||base.deliveryDate;
+      document.getElementById('tokenRemark').value=data.fields.remark?data.remark:base.remark;
+      renderTokenItemsTable(mergeVoiceItems_(base.items,data.items));
       calcTokenTotals();
+    }
+    function applyVoiceTokenSpeech_(text, finalResult){
+      if(!tokenVoiceActive_)return;
+      if(!tokenVoiceDraft_)beginVoiceTokenDraft_();
+      var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
+      tokenVoiceLastParsed_=data;
+      document.getElementById('voiceTokenTranscript').textContent=text;
+      fillVoiceTokenForm_(data,base);
+      if(!finalResult)return;
+      tokenVoicePending_=data.pending;tokenVoiceDraft_=null;tokenVoiceActive_=false;
+      document.getElementById('voiceTokenBtn').disabled=false;
+      document.getElementById('voiceTokenStopBtn').disabled=true;
+      if(data.fields.phone && /^\d{10}$/.test(data.phone) && !data.fields.name){
+        if(data.phone!==base.phone)document.getElementById('tokenCustomerName').value='';
+        lookupTokenCustomer();
+      }
+      document.getElementById('voiceTokenStatus').textContent=data.issues.length?data.issues.join(' '):data.pending?'Continue the '+data.pending.field+' field by tapping Start Voice Token again.':'Fields filled. Speak more with Start Voice Token, or review and tap Save Token.';
+      if(data.saveRequested&&!data.issues.length&&!data.pending)confirmVoiceToken_(text);
     }
 
     function confirmVoiceToken_(transcript){
       var name = document.getElementById('tokenCustomerName').value.trim();
       var phone = document.getElementById('tokenPhone').value.trim();
-      var items = getTokenItems();
-      if(!name || !/^\d{10}$/.test(phone) || !items.length || items.some(function(it){ return !it.item||!it.service||it.qty<=0; })){
+      var items = getTokenItemsForSave_();
+      if(!name || !/^\d{10}$/.test(phone) || !items.length || items.some(function(it){ return !it.item||!it.service||!Number.isInteger(Number(it.qty))||it.qty<=0||(it.service==='KG'&&!(Number(it.weight)>0)); })){
         document.getElementById('voiceTokenStatus').textContent = 'Some details were not understood. Correct the form or speak again.';
         document.getElementById('voiceTokenBtn').disabled = false;
         return;
@@ -1334,19 +1445,15 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       }
     }
 
+    window.onAndroidVoicePartial = function(text){ applyVoiceTokenSpeech_(String(text||''),false); };
     window.onAndroidVoiceResult = function(text, mode){
-      text = String(text||'').trim();
-      if(mode === 'confirmation'){
-        handleVoiceTokenConfirmation_(text);
-        return;
-      }
-      document.getElementById('voiceTokenTranscript').textContent = text;
-      var parsed = parseVoiceToken_(text);
-      fillVoiceTokenForm_(parsed);
-      if(parsed.items.length) confirmVoiceToken_(text);
+      text=String(text||'').trim();
+      if(mode==='confirmation'){handleVoiceTokenConfirmation_(text);return;}
+      applyVoiceTokenSpeech_(text,true);
     };
 
     window.onAndroidVoiceError = function(message){
+      tokenVoiceActive_=false;tokenVoiceDraft_=null;
       document.getElementById('voiceTokenStatus').textContent = String(message||'Android voice recognition failed.');
       document.getElementById('voiceTokenBtn').disabled = false;
       document.getElementById('voiceTokenStopBtn').disabled = true;
