@@ -591,10 +591,9 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.3 — KG WF / No BLK</small></h2>
-    <button class="btn" type="button" onclick="checkBackendConnection_()">Check backend connection</button><span id="backendConnectionStatus" role="status"></span>
-    <div class="voice-token-panel" id="guidedVoicePanel">
-      <h3>सवाल-जवाब से Token भरें</h3>
+    <h2>Voice Token <small style="font-size:11px">v2.5 Compact</small></h2>
+    <details class="voice-token-panel" id="guidedVoicePanel" style="padding:6px;margin:4px 0">
+      <summary>सवाल-जवाब / Voice confirmation</summary>
       <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
       <button class="btn" type="button" onclick="guidedVoice_.stop(true)">Stop / Review manually</button>
       <label style="display:block;margin:8px 0"><input id="guidedAutoStart" type="checkbox" onchange="guidedVoice_.setAuto(this)" style="width:auto"> मेरी अनुमति से Token खोलते ही सवाल पूछें</label>
@@ -602,32 +601,26 @@
       <div id="guidedTranscript" style="overflow-wrap:anywhere;margin:8px 0"></div>
       <input id="guidedAnswer" type="text" placeholder="आवाज़ न चले तो जवाब यहाँ लिखें" onkeydown="if(event.key==='Enter')guidedVoice_.submitTyped()">
       <button class="btn" type="button" onclick="guidedVoice_.submitTyped()">जवाब भेजें</button>
-    </div>
+    </details>
     <div id="tokenBackendStatus" class="info" role="status"></div>
-    <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
-    <div class="voice-token-panel" id="customerVoicePanel">
-      <h3>1. Customer Details — फोन, नाम, डिलीवरी डेट</h3>
-      <div class="voice-token-actions">
-        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')">🎤 Customer Details</button>
-        <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
-        <span id="voiceTokenStatus" class="info">Hindi, English and Hinglish supported.</span>
-      </div>
-      <div id="voiceTokenTranscript">बोलें: फोन 9876543210, नाम सुनील, डिलीवरी डेट 5 सितंबर 2026। Items के लिए नीचे वाला 🎤 button दबाएँ। समाप्त होने पर Stop दबाएँ।</div>
-    </div>
-    <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly><button class="btn" onclick="newToken()">New</button></div>
+    <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly></div>
+    <div style="display:flex;gap:6px;flex-wrap:nowrap;margin:4px 0"><button class="btn" id="newTokenBtn" type="button" onclick="refreshToken_()" style="margin:0">New Token</button><button class="btn" id="refreshTokenBtn" type="button" onclick="refreshToken_()" style="margin:0">Refresh</button></div>
     <div class="form-row"><label>Token Date:</label><input type="date" id="tokenDate"></div>
     <div class="form-row"><label>Phone:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
     <div class="form-row"><label>Name:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
     <div class="form-row"><label>Delivery Date:</label><input type="date" id="tokenDeliveryDate"></div>
-    <div class="voice-token-panel" id="itemsVoicePanel">
-      <h3>2. Item Table — मात्रा, कपड़ा, सर्विस</h3>
-      <div class="voice-token-actions">
-        <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')">🎤 Items</button>
-        <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
-        <span id="voiceItemsStatus" class="info">बोलें: 5 शर्ट WI और 2 शर्ट DC। लंबे pause के बाद भी बोल सकते हैं।</span>
+    <div id="compactVoiceToolbar" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin:6px 0">
+      <div id="customerVoicePanel" style="min-width:0">
+        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')" style="width:100%;margin:0;padding:8px 4px;white-space:normal">🎤 Customer Details</button>
+        <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
       </div>
-      <div id="voiceItemsTranscript" style="overflow-wrap:anywhere"></div>
+      <div id="itemsVoicePanel" style="min-width:0">
+        <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')" style="width:100%;margin:0;padding:8px 4px;white-space:normal">🎤 Items</button>
+        <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
+      </div>
     </div>
+    <div style="font-size:12px;overflow-wrap:anywhere"><span id="voiceTokenStatus" class="info"></span> <span id="voiceItemsStatus" class="info"></span></div>
+    <details style="margin:3px 0"><summary>सुनी हुई बात / Transcript</summary><div id="voiceTokenTranscript" style="overflow-wrap:anywhere"></div><div id="voiceItemsTranscript" style="overflow-wrap:anywhere"></div></details>
     <div id="tokenItemsTable" class="table-holder"></div>
     <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">Add Item</button>
     <div class="form-row"><label>Total Quantity:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
@@ -703,10 +696,6 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 </script>
 
 <script>
-    function checkBackendConnection_(){
-      var el=document.getElementById('backendConnectionStatus');el.textContent='Checking…';
-      google.script.run.withSuccessHandler(function(r){el.textContent=r&&r.version==='2.3'?'Backend v2.3 connected.':'Backend version mismatch: deploy v2.3.';}).withFailureHandler(function(e){el.textContent=e.message||String(e);}).getBackendInfo();
-    }
     function safeDisplayHtml_(html){
       var template=document.createElement('template');template.innerHTML=String(html||'');
       template.content.querySelectorAll('script,iframe,object,embed,base,meta,link,form').forEach(function(el){el.remove();});
@@ -923,14 +912,29 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       }
     }
 
+    var tokenLoadGeneration_=0;
+    function refreshToken_(){
+      if(localStorage.getItem('lbPending_token_'+(currentUser&&currentUser.username||''))){
+        alert('पिछले Save की पुष्टि बाकी है। पहले token list और records जाँचें; Refresh से duplicate protection नहीं हटेगी।');return;
+      }
+      newToken();
+    }
     function newToken(){
       if(!currentUser||!getActiveSessionToken()){
         document.getElementById('tokenError').textContent='Login must be verified by the backend before a token number can be requested.';return;
       }
       stopVoiceToken();
+      var generation=++tokenLoadGeneration_;
+      tokenVoicePending_=null;tokenVoiceDraft_=null;
+      ['tokenNumber','tokenCustomerName','tokenPhone','tokenRemark'].forEach(function(id){document.getElementById(id).value='';});
+      ['tokenDate','tokenDeliveryDate'].forEach(function(id){document.getElementById(id).value=new Date().toISOString().slice(0,10);});
+      renderTokenItemsTable([]);
+      document.getElementById('saveTokenBtn').disabled=true;
+      if(typeof guidedVoice_!=='undefined'){guidedVoice_.entryPending=null;guidedVoice_.acceptEntryOnce=false;}
       if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=true;
       document.getElementById('tokenError').textContent='Requesting token number from backend…';
       google.script.run.withSuccessHandler(function(n){
+        if(generation!==tokenLoadGeneration_)return;
         tokenVoicePending_=null;tokenVoiceDraft_=null;tokenVoiceActive_=false;
         document.getElementById('tokenNumber').value = n;
         document.getElementById('tokenDate').value = new Date().toISOString().slice(0,10);
@@ -944,6 +948,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         document.getElementById('tokenError').textContent = '';
         if(typeof guidedVoice_!=='undefined'){guidedVoice_.loadingToken=false;guidedVoice_.maybeAuto();}
       }).withFailureHandler(function(e){
+        if(generation!==tokenLoadGeneration_)return;
         if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=false;
         document.getElementById('tokenError').textContent = 'Unable to get new token number: '+(e.message||e);
       }).getNewTokenNumber(getActiveSessionToken());
@@ -1013,7 +1018,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         }).join('');
         html += '<tr class="tokenItemRow">'+
           '<td><input class="token-qty" type="number" min="1" step="1" value="'+(it.qty == null ? 1 : Number(it.qty))+'" oninput="calcTokenItemRow(this)"></td>'+
-          '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"></div></td>'+
+          '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"><button type="button" class="btn" onclick="guidedVoice_.correctItem('+i+')">🎤 सुधारें '+(i+1)+'</button></div></td>'+
           '<td><select class="token-service" onchange="handleTokenServiceChange(this)"><option value="">Select</option>'+options+'</select></td>'+
           '<td><button class="btn token-remove-item" type="button" aria-label="Remove item '+(i+1)+'" title="Remove item" onclick="removeTokenItemRow('+i+')">&times;</button></td></tr>';
       });
@@ -1617,7 +1622,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function handleVoiceTokenConfirmation_(answer){
       answer = String(answer||'').toLowerCase();
       document.getElementById('voiceTokenTranscript').textContent += '\nConfirmation: ' + answer;
-      if(/yes|yeah|haan|han|ha|हाँ|हां|save|सेव|करो/.test(answer)){
+      if(guidedVoice_.yesNo(answer)===true){
         document.getElementById('voiceTokenStatus').textContent = 'Confirmed. Saving token...';
         saveTokenBooking();
       } else {
@@ -2620,15 +2625,19 @@ var guidedVoice_ = {
   },
   ask:function(state,question){
     if(!this.active)return;
+    this.el('guidedVoicePanel').open=true;
     this.cancelInput();this.state=state;this.epoch++;
     var id='g'+this.epoch,self=this;this.promptId=id;
     this.el('guidedQuestion').textContent=question;this.el('guidedAnswer').value='';
+    var controls=this.el('guidedQuickAnswers');
+    if(!controls){controls=document.createElement('div');controls.id='guidedQuickAnswers';controls.innerHTML='<button type="button" class="btn">हाँ / Yes</button> <button type="button" class="btn">नहीं / No</button>';this.el('guidedAnswer').parentNode.appendChild(controls);var self=this;controls.children[0].onclick=function(){self.el('guidedAnswer').value='हाँ';self.submitTyped();};controls.children[1].onclick=function(){self.el('guidedAnswer').value='नहीं';self.submitTyped();};}
+    controls.hidden=!/^(confirm_entry|more|review)$/.test(state);
     if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.speakPrompt(question,id);return;}
     if(window.AndroidVoice&&!window.AndroidVoice.speakPrompt){
       this.el('guidedQuestion').textContent=question+' (आवाज़ के लिए Android v1.5 install करें; अभी जवाब लिख सकते हैं।)';return;
     }
     if(window.speechSynthesis&&typeof SpeechSynthesisUtterance!=='undefined'){
-      var speech=new SpeechSynthesisUtterance(question);speech.lang='hi-IN';speech.rate=0.9;
+      var speech=new SpeechSynthesisUtterance(question);speech.lang='hi-IN';speech.rate=1.05;
       speech.onend=function(){self.promptDone(id);};speech.onerror=function(){self.promptDone(id);};
       window.speechSynthesis.speak(speech);
     }else this.promptDone(id);
@@ -2664,11 +2673,23 @@ var guidedVoice_ = {
   },
   yesNo:function(text){
     var s=voiceClean_(String(text).toLowerCase()).replace(/[.!?।]+$/g,'').trim();
+    if(/^(?:haan|haa|han|ha|हाँ|हां|yes)(?:\s+(?:haan|haa|han|ha|हाँ|हां|yes))*$/.test(s))return true;
+    if(/^(?:hanji|haan ji|ha ji|हाँ जी|हां जी|जी हाँ जी|जी हां जी|yes please|yes ji|yeah|yep|yup|okay|ok|ठीक|ठीक है|सही|सही है|बिल्कुल|bilkul|theek hai|thik hai|sahi hai)$/.test(s))return true;
+    if(/^(?:नहीं जी|नही जी|जी नहीं|जी नही|नहीं नहीं|no no|nope|no thanks|nah|na|nahi ji|nahin ji|गलत|गलत है|wrong)$/.test(s))return false;
     if(/^(?:हाँ|हां|जी हाँ|जी हां|हां सेव करो|हाँ सेव करो|हां सेव कर दो|हाँ सेव कर दो|सेव करो|yes|yes save|yes save it|haa|haan|han|ha|save|save token|जी)$/.test(s))return true;
     if(/^(?:नहीं|नही|ना|बस|नहीं और|no|no more|nahi|nahin|bas)$/.test(s))return false;
     return null;
   },
   rows:function(){return getTokenItemsForSave_();},
+  correctItem:function(index){
+    if(!currentUser||!getActiveSessionToken())return;
+    var rows=getTokenItems();if(!rows[index])return;
+    var target=rows[index],selectedIndex=rows.slice(0,index).filter(function(r){return !voiceIsBlankItem_(r);}).length;
+    rows=rows.filter(function(r){return !voiceIsBlankItem_(r);});
+    if(voiceIsBlankItem_(target))rows.splice(selectedIndex,0,target);
+    stopVoiceToken();this.render(rows);this.active=true;this.itemIndex=selectedIndex;this.entryPending=null;this.acceptEntryOnce=false;
+    this.ask('item','लाइन '+(index+1)+' सुधारें। पूरी quantity, item और service बोलें; जैसे तीन पैंट वॉश आयरन।');
+  },
   render:function(rows){renderTokenItemsTable(rows);calcTokenTotals();},
   afterDate:function(){
     var rows=this.rows();if(rows.length){this.itemIndex=0;this.nextItemField();}else{this.itemIndex=0;this.ask('item','कितने और कौन से कपड़े हैं? जैसे, दो शर्ट वॉश आयरन।');}
@@ -2702,6 +2723,21 @@ var guidedVoice_ = {
     this.cancelInput();this.promptId='';this.el('guidedTranscript').textContent=text;
     if(/^(stop|cancel|रुको|रुकिए|बंद करो|रद्द करो)$/i.test(text)){this.stop(true);return;}
     var state=this.state,rows=this.rows(),result;
+    var correction=voiceNumberText_(text).match(/^(?:line|row|लाइन|पंक्ति)\s+(\d+)\s+(?:correct|edit|change|सुधारो|सुधारें|बदलो|बदलें)$/i);
+    if(correction){var index=Number(correction[1])-1;if(index>=0&&index<getTokenItems().length)this.correctItem(index);else this.ask(state,'यह लाइन नहीं मिली। सही लाइन नंबर बोलें।');return;}
+    if(state==='confirm_entry'){
+      var pending=this.entryPending,accepted=this.yesNo(text);
+      if(!pending){this.stop(true);return;}
+      if(accepted===true){this.entryPending=null;this.state=pending.state;this.acceptEntryOnce=true;this.listening=true;this.receive(pending.text);}
+      else if(accepted===false){this.entryPending=null;this.ask(pending.state,'ठीक है, '+pending.label+' दोबारा बोलें।');}
+      else this.ask('confirm_entry','मैंने सुना '+pending.text+'। सही है? हाँ या नहीं बोलें, या बटन दबाएँ।');
+      return;
+    }
+    if(/^(phone|name|date|item|service|weight|remark)$/.test(state)&&!this.acceptEntryOnce){
+      var labels={phone:'फोन नंबर',name:'नाम',date:'डिलीवरी तारीख',item:'आइटम',service:'सर्विस',weight:'वजन',remark:'रिमार्क'};
+      this.entryPending={state:state,text:text,label:labels[state]};this.ask('confirm_entry',labels[state]+': '+text+'। सही है?');return;
+    }
+    this.acceptEntryOnce=false;
     if(state==='phone'){
       var phoneText=text.replace(/^(?:phone|mobile|फोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?\s*/i,'');
       var phone=voiceReadPhone_(phoneText);
@@ -2714,7 +2750,7 @@ var guidedVoice_ = {
       google.script.run.withSuccessHandler(function(name){
         if(!self.active||self.epoch!==epoch||self.value('tokenPhone')!==phone.value)return;
         if(self.timer){clearTimeout(self.timer);self.timer=null;}
-        if(typeof name==='string'&&name.trim()){self.el('tokenCustomerName').value=name.trim();self.ask('date',name.trim()+' जी, डिलीवरी किस तारीख को चाहिए?');}
+        if(typeof name==='string'&&name.trim()){self.entryPending={state:'name',text:name.trim(),label:'नाम'};self.ask('confirm_entry','इस नंबर पर नाम '+name.trim()+' मिला। सही है?');}
         else self.ask('name','इस नंबर का नाम नहीं मिला। आपका नाम क्या है?');
       }).withFailureHandler(function(e){if(self.active&&self.epoch===epoch)self.fail('Customer lookup नहीं हुआ: '+(e.message||e));}).getCustomerByPhone(phone.value,getActiveSessionToken());return;
     }
