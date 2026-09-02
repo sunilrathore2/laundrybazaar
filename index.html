@@ -591,7 +591,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.6</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.7</small></h2>
     <div id="tokenBackendStatus" class="info" role="status"></div>
     <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
     <div class="voice-token-panel" id="customerVoicePanel">
@@ -1090,9 +1090,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function normalizeVoiceAliases_(text){
-      var value = String(text||'');
+      var value = String(text||'').replace(/(\d)(?=kgs?\b)/gi,'$1 ');
       var aliases = [
-        [/\bw\s*\.?\s*i\b|डब्ल्यू\s*आई/gi,'WI'],
+        [/\b(?:w|dablu|dabloo|dab[lw]oo|double\s*u)\s*\.?\s*(?:i|aai|ai|eye)\b|(?:डब्ल्यू|डब्लू|डबल्यू|डबलू|डबल यू|डब्ल्यु|डबल्यु)\s*(?:आई|आइ)/gi,'WI'],
         [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
         [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?fold(?:ing)?\b|(?:वॉश|वाश|वॉस)\s*(?:(?:एंड|एण्ड|और|&)\s*)?फोल्ड/gi,'WF'],
         [/\b(?:narso|narson|nurso)\b|नरसों|नरसो/gi,'narso'],
@@ -1107,7 +1107,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\bi\s*\.?\s*r\b|आई\s*आर/gi,'IR'],
         [/\b(?:(?:only|just|khali|sirf)\s+)?(?:iron(?:ing)?|press(?:ing)?|istri|istree)(?:\s+(?:press|iron(?:ing)?))?(?:\s+(?:karna|karo|kar\s*do))?(?:\s+hai)?\b/gi,'IR'],
         [/(?:(?:खाली|सिर्फ|केवल)\s*)?(?:आयरनिंग|आयरन|प्रेस|प्रैस|इस्त्री|इस्तरी)(?:\s*(?:प्रेस|आयरनिंग|आयरन))?(?:\s*(?:करना|करो|कर\s*दो))?(?:\s*है)?/g,'IR'],
-        [/\b(?:k\s*g|kgs?|kilo(?:gram)?)\b|के\s*जी|किलो(?:ग्राम)?/gi,'kg'],
+        [/\b(?:k\s*\.?\s*g\.?|kgs?|kilo(?:gram)?s?)\b|के\s*\.?\s*जी\.?|केज|किलो(?:ग्राम)?/gi,'kg'],
+        [/\b(?:s\s*h|shoe[s]?\s*clean(?:ing)?)\b|एस\s*एच|शू(?:ज़|ज)?\s*क्लीनिंग|जूते\s*की\s*सफाई/gi,'SH'],
+        [/\b(?:sooj|jute|joote|joota|shoes?)\b|जूते|जूता|जुते|शूज़|शूज|शू/gi,'shoe'],
+        [/\bb\s*l\s*k\b|बी\s*एल\s*के/gi,'BLK'],
         [/\b(?:sart|shart|shert)\b|सर्ट|शर्ट/gi,'shirt'],
         [/\b(?:paint|pent|paant)\b|पेंट|पैंट/gi,'pant'],
         [/\b(?:jin|jins|jean)\b|जीन्स|जींस|जीन/gi,'jeans'],
@@ -1126,6 +1129,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function resolveVoiceService_(spoken, isKg){
       var cleaned = normalizeVoiceAliases_(spoken).toLowerCase().replace(/\b(ki|ka|ke|me|mein|service|hai|hain)\b|की|का|के|में|सर्विस|हैं|है/g,' ').replace(/\s+/g,' ').trim();
       var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold)$/.test(cleaned) ? 'WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
+      var exact=serviceOptions.find(function(opt){return String(opt).trim().toUpperCase()===code;});
+      if(exact)return exact;
       return serviceOptions.find(function(opt){
         var o = String(opt).trim().toUpperCase();
         return o === code || (code === 'WI' && /WASH.*IRON/.test(o)) || (code === 'WF' && /WASH.*FOLD/.test(o)) || (code === 'DC' && /DRY.*CLEAN/.test(o)) || (code === 'IR' && /^(IRON(?:ING)?|PRESS(?:ING)?)$/.test(o));
@@ -1231,7 +1236,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var months={january:1,jan:1,'जनवरी':1,janvari:1,february:2,feb:2,'फरवरी':2,'फ़रवरी':2,farvari:2,march:3,mar:3,'मार्च':3,april:4,apr:4,'अप्रैल':4,may:5,'मई':5,june:6,jun:6,'जून':6,july:7,jul:7,'जुलाई':7,august:8,aug:8,'अगस्त':8,september:9,sep:9,sept:9,'सितंबर':9,'सितम्बर':9,sitambar:9,sitamber:9,october:10,oct:10,'अक्टूबर':10,november:11,nov:11,'नवंबर':11,'नवम्बर':11,december:12,dec:12,'दिसंबर':12,'दिसम्बर':12};
       var today=reference||new Date(),match,day,month,year,end=0;
       var monthNames=Object.keys(months).sort(function(a,b){return b.length-a.length;}).join('|');
-      match=text.match(new RegExp('^\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+('+monthNames+')(?:\\s+(\\d{4}|\\d{2})(?=\\s|$|[,;।]))?','i'));
+      match=text.match(new RegExp('^\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:(?:तारीख़?|tarikh|tareekh)\\s+)?('+monthNames+')(?:\\s+(\\d{4}|\\d{2})(?=\\s|$|[,;।]))?','i'));
       if(match){day=Number(match[1]);month=months[match[2].toLowerCase()];year=match[3]?Number(match[3]):today.getFullYear();end=match[0].length;}
       else if((match=text.match(/^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?=\s|$|[,;।])/))){year=Number(match[1]);month=Number(match[2]);day=Number(match[3]);end=match[0].length;}
       else if((match=text.match(/^\s*(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?=\s|$|[,;।])/)) || (match=text.match(/^\s*(\d{1,2})\s+(\d{1,2})\s+(\d{4})(?=\s|$|[,;।])/))){day=Number(match[1]);month=Number(match[2]);year=Number(match[3]);end=match[0].length;}
@@ -1262,10 +1267,15 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function voiceReadItems_(input){
       // Normalize the service before splitting "and": wash AND iron stays one service.
       var text=voiceNumberText_(normalizeVoiceAliases_(input)).replace(/\b(?:quantity|qty|item|service)\s*[:\-]?\s*|(?:आइटम|मात्रा|सर्विस|सेवा)\s*[:\-]?\s*/gi,' ');
-      var serviceNames=['WI','WF','DC','IR','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
+      text=text.replace(/(\d)\s+(?:hundred|सौ)(?=\s|$)/gi,function(_,n){return String(Number(n)*100);});
+      // Convert mixed units before row splitting, so 'kg 400 gram' is not another row.
+      text=text.replace(/(\d+(?:\.\d+)?)\s*kg\s*(\d+(?:\.\d+)?)\s*(?:grams?|gm|g|ग्राम)(?=\s|$|[,;।])/gi,function(_,kg,g){return String(Math.round((Number(kg)+Number(g)/1000)*1000)/1000)+' kg';});
+      text=text.replace(/(\d+(?:\.\d+)?)\s*(?:grams?|gm|g|ग्राम)(?=\s|$|[,;।])/gi,function(_,g){return String(Number(g)/1000)+' kg';});
+      text=text.replace(/(\d)(kg)(?=\s|$|[,;।])/gi,'$1 $2').replace(/\bkg(?:\s+kg)+\b/gi,'kg');
+      var serviceNames=['WI','WF','DC','IR','SH','BLK','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
       var services=serviceNames.join('|'),rows=[],issues=[];
       // A completed service may also delimit adjacent rows without a spoken "और".
-      text=text.replace(new RegExp('('+services+')\\s+(?=\\d+\\s+[^\\d])','gi'),'$1 ; ');
+      text=text.replace(/\b(WI|WF|DC|IR|SH|BLK)\s+(?=\d+\s+[^\d])/gi,'$1 ; ');
       var chunks=text.split(/(?:^|\s)(?:और|aur|and)(?=\s|$)|[,;।\n]/i);
       var leading=/^\s*(?:और|aur|and)(?=\s|$)/i.test(text),trailing=/(?:^|\s)(?:और|aur|and)\s*$/i.test(text);
       chunks.forEach(function(chunk){
@@ -1273,6 +1283,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         var qtyMatch=chunk.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
         if(!qtyMatch){issues.push('Incomplete item: '+chunk);return;}
         var qty=Number(qtyMatch[1]),body=qtyMatch[2],service='',weight=0,item=body;
+        if(/^SH$/i.test(body))body='shoe SH';
         var serviceMatch=body.match(new RegExp('\\s+('+services+')(?=\\s|$)(.*)$','i'));
         if(serviceMatch){
           service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));
@@ -1280,7 +1291,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           var after=voiceClean_(serviceMatch[2]).replace(/^(?:hai|hain|है|हैं)\s*/i,'');
           if(/^kg$/i.test(serviceMatch[1])){
             var beforeWeight=item.match(/\s+(\d+(?:\.\d+)?)$/);
-            var afterWeight=after.match(/^(?:weight|वजन|वज़न|वेट)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i);
+            var afterWeight=after.match(/^(?:(?:weight|वजन|वज़न|वेट)\s*[:\-]?\s*)?(\d+(?:\.\d+)?)(?:\s*kg)?/i);
             if(beforeWeight){weight=Number(beforeWeight[1]);item=item.slice(0,beforeWeight.index);}
             else if(afterWeight){weight=Number(afterWeight[1]);after=after.slice(afterWeight[0].length);}
             if(!(weight>0))issues.push('Weight is required for KG item: '+item);
@@ -1288,6 +1299,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           if(voiceClean_(after)&&! /^(?:hai|hain|है|हैं|करना|करो|karna|karo)$/i.test(voiceClean_(after)))issues.push('Check extra item words: '+after);
         }
         item=item.replace(/\s+(?:hai|hain|ki|ka|ke|है|हैं|की|का|के)\s*$/i,'').trim();
+        if(!serviceMatch){
+          if(/\bshoe\b/i.test(item))service=resolveVoiceService_('SH',false);
+          else if(/\bblankets?\b|कम्बल/i.test(item))service=resolveVoiceService_('BLK',false);
+        }
         if(!Number.isInteger(qty)||qty<=0)issues.push('Quantity must be a positive whole number.');
         if(!service)issues.push('Select the service for: '+item);
         rows.push({service:service,item:normalizeVoiceItem_(item),qty:qty,weight:weight,rate:0,amt:0});
@@ -1316,6 +1331,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var raw=String(speech||'').trim(),result={name:'',phone:'',deliveryDate:'',remark:'',items:[],issues:[],pending:null,fields:{},saveRequested:false};
       if(!pending && /^\s*(?:\d{1,2}|pandrah|pandra|pandara|fifteenth)(?:st|nd|rd|th)?\s*(?:तारीख़?|तारिख|tarikh|tareekh|date)(?=\s|$|[।,.])/i.test(voiceNumberText_(raw)))raw='delivery date '+raw;
       raw=raw.replace(/डिलेवरी|डिलिवेरी|डिलीवेरी/g,'डिलीवरी');
+      // Recognize day-before-tarikh after a name/phone as well, without changing names or remarks.
+      var remarkAt=raw.search(/(?:^|\s)(?:remark|remarks|note|रिमार्क|टिप्पणी)(?=\s|:|$)/i);
+      var prefix=remarkAt>=0?raw.slice(0,remarkAt):raw,suffix=remarkAt>=0?raw.slice(remarkAt):'';
+      prefix=prefix.replace(/(^|[\s,;])([\d०-९]{1,2}|पंद्रह|पन्द्रह|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|ग्यारह|बारह|तेरह|चौदह|सोलह|सत्रह|अठारह|उन्नीस|बीस|इक्कीस|बाईस|तेईस|चौबीस|पच्चीस|छब्बीस|सत्ताईस|अट्ठाईस|उनतीस|तीस|इकतीस)\s+(तारीख़?|तारिख|tarikh|tareekh)(?=\s|$|[,;।])/gi,function(all,space,day,label,offset,source){
+        if(/(?:delivery|डिलीवरी|डिलिवरी)(?:\s+(?:date|डेट|की|में|तारीख))*\s*$/i.test(source.slice(0,offset)))return all;
+        return space+'delivery date '+day+' '+label;
+      });
+      raw=prefix+suffix;
       var labels=/(^|[\s,;।])((?:delivery\s*(?:date)?|डिलीवरी\s*(?:डेट|तारीख)?|डिलिवरी\s*(?:डेट|तारीख)?)|(?:phone|mobile|फोन|फ़ोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?|(?:customer\s*name|name|naam|नाम)|(?:remark|remarks|note|रिमार्क|टिप्पणी))\s*[:\-]?\s*/gi;
       if(pending && !/^(?:phone|mobile|फोन|फ़ोन|मोबाइल|नाम|name|naam|delivery|डिलीवरी|डिलिवरी|remark|रिमार्क)(?=\s|:|$)/i.test(raw))raw=pending.field+' '+(pending.text||'')+' '+raw;
       var save=raw.match(/(?:^|\s)(?:save\s+token|token\s+save|टोकन\s+सेव(?:\s+(?:करो|करना|कर\s*दो))?)\s*[.!।]?$/i);
@@ -1392,6 +1415,17 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(!tokenVoiceActive_)return;
       if(!tokenVoiceDraft_)beginVoiceTokenDraft_();
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
+      if(tokenVoiceScope_==='items'){
+        var weightOnly=voiceNumberText_(normalizeVoiceAliases_(text)).replace(/(\d)\s+(?:hundred|सौ)(?=\s|$)/gi,function(_,n){return String(Number(n)*100);}).trim();
+        if(/^(?:kg\s+)?\d+(?:\.\d+)?\s*kg(?:\s+\d+(?:\.\d+)?\s*(?:grams?|gm|g|ग्राम))?(?:\s+kg)*$/i.test(weightOnly)){
+          var weightResult=voiceReadItems_('1 Weight '+weightOnly),last=base.items.length-1;
+          if(last>=0&&base.items[last].item&&weightResult.items.length===1&&weightResult.items[0].weight>0){
+            base=Object.assign({},base,{items:base.items.map(function(row){return Object.assign({},row);})});
+            base.items[last].service=resolveVoiceService_('KG',true);base.items[last].weight=weightResult.items[0].weight;
+            data.items=[];data.issues=weightResult.issues;
+          }else data.issues=['पहले quantity और item बोलें, फिर वजन बताएँ।'];
+        }
+      }
       if(tokenVoiceScope_==='details')data.items=[];
       if(tokenVoiceScope_==='items'){
         data.fields={};data.name=base.name;data.phone=base.phone;data.deliveryDate=base.deliveryDate;data.remark=base.remark;
@@ -1646,6 +1680,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var existingItems=getTokenItems();
       serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(Boolean) : [];
       tokenServicesReady_=serviceOptions.length>0;
+      // These are the owner's confirmed token service codes, not invented prices.
+      if(tokenServicesReady_)['WI','WF','DC','IR','SH','BLK','KG'].forEach(function(code){
+        if(!serviceOptions.some(function(s){return s.toUpperCase()===code;}))serviceOptions.push(code);
+      });
       if(!serviceOptions.some(function(s){ return String(s).trim().toUpperCase()==='KG'; })) serviceOptions.push('KG');
       renderTokenItemsTable(existingItems);
       document.querySelectorAll('#itemsTable .service').forEach(function(select){
