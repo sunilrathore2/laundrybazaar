@@ -279,6 +279,8 @@
     .voice-token-panel { width:100%; padding:10px; margin:8px 0 12px; border:1px solid #FFA500; border-radius:7px; background:#fff8e8; }
     .voice-token-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
     #voiceTokenBtn { background:#1565c0 !important; }
+    #voiceItemsBtn { background:#087f5b !important; }
+    .voice-token-panel h3 { margin:0 0 8px; font-size:15px; }
     #voiceTokenStopBtn { background:#666 !important; }
     #voiceTokenTranscript { width:100%; min-height:54px; margin-top:8px; padding:7px; white-space:pre-wrap; overflow-wrap:anywhere; background:#fff; border:1px solid #ddd; border-radius:5px; }
     #tokenItemsTable { width:100% !important; padding:0 !important; margin:0 0 10px !important; background:transparent !important; overflow-x:hidden !important; }
@@ -432,6 +434,7 @@
       <div class="login-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()"></div>
       <button class="btn" style="width:100%;" onclick="doLogin()">Login</button>
       <div id="loginError" class="error"></div>
+      <button class="btn" type="button" onclick="restoreSavedSession_()">Retry saved login / connection</button>
     </div>
   </div>
   <div class="top-header">
@@ -588,8 +591,11 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order</h2>
-    <div class="voice-token-panel">
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.5</small></h2>
+    <div id="tokenBackendStatus" class="info" role="status"></div>
+    <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
+    <div class="voice-token-panel" id="customerVoicePanel">
+      <h3>1. Customer Details — फोन, नाम, डिलीवरी डेट</h3>
       <div class="voice-token-actions">
         <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')">🎤 Customer Details</button>
         <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
@@ -602,7 +608,8 @@
     <div class="form-row"><label>Phone:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
     <div class="form-row"><label>Name:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
     <div class="form-row"><label>Delivery Date:</label><input type="date" id="tokenDeliveryDate"></div>
-    <div class="voice-token-panel">
+    <div class="voice-token-panel" id="itemsVoicePanel">
+      <h3>2. Item Table — मात्रा, कपड़ा, सर्विस</h3>
       <div class="voice-token-actions">
         <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')">🎤 Items</button>
         <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
@@ -648,6 +655,8 @@
 // This page runs directly on GitHub Pages; only data requests go to Apps Script.
 window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIbZxp7e4TkbVp1AV5oXu5EkJqUHl69FfA3CqS9CzUmoMjRX9hS/exec';
 (function(){
+  // Preserve the native bridge if this HTML is served by Apps Script itself.
+  if(window.google && window.google.script && window.google.script.run)return;
   function runner(success, failure, userObject){
     return new Proxy({}, {get:function(_, name){
       if(name === 'withSuccessHandler') return function(fn){return runner(fn,failure,userObject);};
@@ -722,6 +731,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     let serviceOptions = [];
+    let tokenServicesReady_ = false;
     let lookupTimeout = null;
 
     let sessionToken = localStorage.getItem('lbSession') || '';
@@ -730,8 +740,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     let voiceTokenRecognition = null;
     let voiceTokenConfirmRecognition = null;
 
-    window.onload = function() {
+    window.onload = function() {restoreSavedSession_();};
+    function restoreSavedSession_() {
+      sessionToken=localStorage.getItem('lbSession')||'';
       if (sessionToken) {
+        document.getElementById('loginError').textContent='Checking saved login with backend…';
         google.script.run
           .withSuccessHandler(function(res){
             if (res && res.success) {
@@ -739,19 +752,20 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
             } else {
               localStorage.removeItem('lbSession');
               sessionToken='';
+              document.getElementById('loginError').textContent='Saved session is no longer valid. Please login.';
               document.getElementById('loginUsername').focus();
             }
           })
-          .withFailureHandler(function(){
-            localStorage.removeItem('lbSession');
-            sessionToken='';
+          .withFailureHandler(function(e){
+            // A network/deployment failure is not evidence that the session is invalid.
+            document.getElementById('loginError').textContent='Cannot verify saved login: '+(e.message||e)+'. Use Retry saved login / connection.';
             document.getElementById('loginUsername').focus();
           })
           .getSession(sessionToken);
       } else {
         document.getElementById('loginUsername').focus();
       }
-    };
+    }
 
     function getActiveSessionToken() {
       var stored = localStorage.getItem('lbSession') || '';
@@ -779,7 +793,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       userBar.appendChild(logoutButton);
       applyRole(normalizedRole);
       google.script.run.withSuccessHandler(setLogo).getLogo(getActiveSessionToken());
-      google.script.run.withSuccessHandler(setServices).getServices(getActiveSessionToken());
+      loadTokenServices_();
       addNewOrder();
       if(normalizedRole==='admin') loadTelegramSettings();
       if(normalizedRole==='delivery' || normalizedRole==='admin' || normalizedRole==='manager') { newToken(); loadTokens(); }
@@ -869,6 +883,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function newToken(){
+      if(!currentUser||!getActiveSessionToken()){
+        document.getElementById('tokenError').textContent='Login must be verified by the backend before a token number can be requested.';return;
+      }
+      stopVoiceToken();
+      document.getElementById('tokenError').textContent='Requesting token number from backend…';
       google.script.run.withSuccessHandler(function(n){
         tokenVoicePending_=null;tokenVoiceDraft_=null;tokenVoiceActive_=false;
         document.getElementById('tokenNumber').value = n;
@@ -938,7 +957,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function renderTokenItemsTable(items){
-      items = Array.isArray(items) && items.length ? items : [{service:'',item:'',rate:'',qty:1,weight:'',amt:0}];
+      items = Array.isArray(items) ? items : [{service:'',item:'',rate:'',qty:1,weight:'',amt:0}];
       var html = '<table><thead><tr><th>Qty</th><th>Item</th><th>Service</th><th></th></tr></thead><tbody>';
       items.forEach(function(it, i){
         var options = serviceOptions.map(function(opt){
@@ -948,7 +967,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           '<td><input class="token-qty" type="number" min="1" step="1" value="'+(it.qty == null ? 1 : Number(it.qty))+'" oninput="calcTokenItemRow(this)"></td>'+
           '<td><div class="item-input-stack"><input class="token-item" value="'+escapeHtml(it.item||'')+'" oninput="capitalizeInput(this)"><input class="token-weight" type="number" min="0" step="0.01" placeholder="Weight" value="'+escapeHtml(it.weight||'')+'" oninput="calcTokenItemRow(this)"></div></td>'+
           '<td><select class="token-service" onchange="handleTokenServiceChange(this)"><option value="">Select</option>'+options+'</select></td>'+
-          '<td>'+(items.length>1?'<button class="btn token-remove-item" type="button" onclick="removeTokenItemRow('+i+')">&times;</button>':'')+'</td></tr>';
+          '<td><button class="btn token-remove-item" type="button" aria-label="Remove item '+(i+1)+'" title="Remove item" onclick="removeTokenItemRow('+i+')">&times;</button></td></tr>';
       });
       html += '</tbody></table>';
       document.getElementById('tokenItemsTable').innerHTML = html;
@@ -963,7 +982,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function removeTokenItemRow(index){
+      if(tokenVoiceActive_)stopVoiceToken();
       var items = getTokenItems();
+      if(!Number.isInteger(index)||index<0||index>=items.length)return;
       items.splice(index, 1);
       renderTokenItemsTable(items);
     }
@@ -1017,6 +1038,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function startVoiceToken(scope){
+      if(!currentUser||!getActiveSessionToken()){
+        document.getElementById('tokenError').textContent='Please login first. Voice entry requires a verified session.';return;
+      }
+      if(scope==='items'&&!tokenServicesReady_){
+        document.getElementById('tokenError').textContent='Services have not loaded from the backend. Tap Reload services and check the connection message.';return;
+      }
       stopVoiceToken();
       tokenVoiceScope_=scope||'details';tokenVoicePending_=null;
       beginVoiceTokenDraft_();tokenVoiceContinuous_=true;voiceButtons_(true);
@@ -1067,15 +1094,19 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var aliases = [
         [/\bw\s*\.?\s*i\b|डब्ल्यू\s*आई/gi,'WI'],
         [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
-        [/\bwash\s*(?:and\s*)?fold\b|वॉश\s*(?:एंड\s*)?फोल्ड/gi,'WF'],
+        [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?fold(?:ing)?\b|(?:वॉश|वाश|वॉस)\s*(?:(?:एंड|एण्ड|और|&)\s*)?फोल्ड/gi,'WF'],
         [/\b(?:narso|narson|nurso)\b|नरसों|नरसो/gi,'narso'],
         [/\b(?:parso|parson|barso|farso)\b|परसों|परसो/gi,'parso'],
         // Map spoken washing + ironing instructions to the WI service code.
         [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?(?:iron(?:ing)?|press(?:ing)?)\b|\bwashiron\b/gi,'WI'],
         [/\b(?:dho\s*(?:ke|kar)|dhoke|dhokar)\s*(?:(?:phir|fir)\s*)?(?:press|pres|iron|istri|istree)(?:\s+(?:karna|karo|kar\s*do|kar\s*dena))?\b/gi,'WI'],
-        [/धो\s*(?:के|कर)\s*(?:(?:फिर)\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
+        [/(?:धो\s*(?:के|कर(?:के)?)|धुलाई\s*(?:करके|कर\s*के|के\s*बाद))\s*(?:फिर\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
         [/(?:वॉश|वाश|वास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
         [/\b(?:d\s*c|dry\s*clean(?:ing)?)\b|डी\s*सी|ड्राई\s*क्लीन(?:िंग)?/gi,'DC'],
+        // Washing combinations above must take precedence over standalone ironing.
+        [/\bi\s*\.?\s*r\b|आई\s*आर/gi,'IR'],
+        [/\b(?:(?:only|just|khali|sirf)\s+)?(?:iron(?:ing)?|press(?:ing)?|istri|istree)(?:\s+(?:press|iron(?:ing)?))?(?:\s+(?:karna|karo|kar\s*do))?(?:\s+hai)?\b/gi,'IR'],
+        [/(?:(?:खाली|सिर्फ|केवल)\s*)?(?:आयरनिंग|आयरन|प्रेस|प्रैस|इस्त्री|इस्तरी)(?:\s*(?:प्रेस|आयरनिंग|आयरन))?(?:\s*(?:करना|करो|कर\s*दो))?(?:\s*है)?/g,'IR'],
         [/\b(?:k\s*g|kgs?|kilo(?:gram)?)\b|के\s*जी|किलो(?:ग्राम)?/gi,'kg'],
         [/\b(?:sart|shart|shert)\b|सर्ट|शर्ट/gi,'shirt'],
         [/\b(?:paint|pent|paant)\b|पेंट|पैंट/gi,'pant'],
@@ -1097,7 +1128,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold)$/.test(cleaned) ? 'WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
       return serviceOptions.find(function(opt){
         var o = String(opt).trim().toUpperCase();
-        return o === code || (code === 'WI' && /WASH.*IRON/.test(o)) || (code === 'WF' && /WASH.*FOLD/.test(o)) || (code === 'DC' && /DRY.*CLEAN/.test(o));
+        return o === code || (code === 'WI' && /WASH.*IRON/.test(o)) || (code === 'WF' && /WASH.*FOLD/.test(o)) || (code === 'DC' && /DRY.*CLEAN/.test(o)) || (code === 'IR' && /^(IRON(?:ING)?|PRESS(?:ING)?)$/.test(o));
       }) || '';
     }
 
@@ -1108,7 +1139,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var words = [
         ['टी शर्ट|टीशर्ट|t shirt|tshirts|tshirt','tshirt'],
         ['कमीज़|कमीज|शर्ट|shirts|shirt','shirt'],
-        ['पतलून|ट्राउजर|ट्राउज़र्स|trousers|trouser|पतलूनों|pant|pants','trouser'],
+        ['पैंट|पेंट|pant|pants|pent|paant','pant'],
+        ['पतलून|ट्राउजर|ट्राउज़र्स|trousers|trouser|पतलूनों','trouser'],
         ['जींस|जीन्स|jeans','jeans'],
         ['कोट|coats','coat'],['पूरा|पूरी|फुल|poora|pura','full'],['आधा|आधी|हाफ|aadha|adha','half'],
         ['सूट|suits','suit'],['पीस|पीसेस|टुकड़े|pieces|piece|pcs','pcs'],
@@ -1149,7 +1181,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       function has(word){return (' '+text+' ').indexOf(' '+word+' ')>=0;}
       if(has('tshirt')) return 'Tshirt';
       if(has('shirt')) return 'Shirt';
-      if(has('trouser')||has('jeans')) return 'Trouser/Jeans';
+      if(has('pant')) return 'Pant';
+      if(has('trouser')) return 'Trouser';
+      if(has('jeans')) return 'Jeans';
       if(has('coat')) return has('half')?'Half-Coat':has('full')?'Full-Coat':'Coat';
       if(has('suit')) return has('3')&&has('pcs')?'Suit 3 Pcs':has('2')&&has('pcs')?'Suit 2 Pcs':'Suit';
       if(has('jacket')) return has('leather')?'Jacket-Leather':has('normal')?'Jacket-Normal':'Jacket';
@@ -1203,6 +1237,13 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         var word=match[1].toLowerCase(),delta=/narso|नरसो|नरसों/.test(word)?3:/parso|परसो|परसों|day after/.test(word)?2:/tomorrow|kal|कल/.test(word)?1:0;
         var date=new Date(today.getFullYear(),today.getMonth(),today.getDate()+delta);day=date.getDate();month=date.getMonth()+1;year=date.getFullYear();end=match[0].length;
       }
+      else if((match=text.match(/^\s*(\d{1,2})(?:st|nd|rd|th)?\s*(?:तारीख|तारीख़|tarikh|tareekh|date)(?=\s|$|[,;।])/i)) || (match=text.match(/^\s*(\d{1,2})(?:st|nd|rd|th)?\s*$/i))){
+        day=Number(match[1]);month=today.getMonth()+1;year=today.getFullYear();end=match[0].length;
+        var lastDay=new Date(year,month,0).getDate();
+        if(today.getDate()>lastDay-7 && day<today.getDate()){
+          month++;if(month>12){month=1;year++;}
+        }
+      }
       if(!end)return {value:'',rest:text,consumed:false,error:voiceClean_(text)?'Delivery date not understood. Say: 5 September 2026.':''};
       if(year<100)year+=2000;
       var checked=new Date(year,month-1,day);
@@ -1218,7 +1259,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function voiceReadItems_(input){
       // Normalize the service before splitting "and": wash AND iron stays one service.
       var text=voiceNumberText_(normalizeVoiceAliases_(input)).replace(/\b(?:quantity|qty|item|service)\s*[:\-]?\s*|(?:आइटम|मात्रा|सर्विस|सेवा)\s*[:\-]?\s*/gi,' ');
-      var serviceNames=['WI','WF','DC','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
+      var serviceNames=['WI','WF','DC','IR','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
       var services=serviceNames.join('|'),rows=[],issues=[];
       // A completed service may also delimit adjacent rows without a spoken "और".
       text=text.replace(new RegExp('('+services+')\\s+(?=\\d+\\s+[^\\d])','gi'),'$1 ; ');
@@ -1270,6 +1311,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     function parseVoiceToken_(speech, pending){
       var raw=String(speech||'').trim(),result={name:'',phone:'',deliveryDate:'',remark:'',items:[],issues:[],pending:null,fields:{},saveRequested:false};
+      if(!pending && /^\s*\d{1,2}(?:st|nd|rd|th)?\s*(?:तारीख|तारीख़|tarikh|tareekh|date)\s*[।,.]?\s*$/i.test(voiceNumberText_(raw)))raw='delivery date '+raw;
       var labels=/(^|[\s,;।])((?:delivery\s*(?:date)?|डिलीवरी\s*(?:डेट|तारीख)?|डिलिवरी\s*(?:डेट|तारीख)?)|(?:phone|mobile|फोन|फ़ोन|मोबाइल)(?:\s*(?:number|नंबर|नम्बर))?|(?:customer\s*name|name|naam|नाम)|(?:remark|remarks|note|रिमार्क|टिप्पणी))\s*[:\-]?\s*/gi;
       if(pending && !/^(?:phone|mobile|फोन|फ़ोन|मोबाइल|नाम|name|naam|delivery|डिलीवरी|डिलिवरी|remark|रिमार्क)(?=\s|:|$)/i.test(raw))raw=pending.field+' '+(pending.text||'')+' '+raw;
       var save=raw.match(/(?:^|\s)(?:save\s+token|token\s+save|टोकन\s+सेव(?:\s+(?:करो|करना|कर\s*दो))?)\s*[.!।]?$/i);
@@ -1597,10 +1639,33 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function setServices(opts) {
-      serviceOptions = Array.isArray(opts) ? opts.slice() : [];
+      var existingItems=getTokenItems();
+      serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(Boolean) : [];
+      tokenServicesReady_=serviceOptions.length>0;
       if(!serviceOptions.some(function(s){ return String(s).trim().toUpperCase()==='KG'; })) serviceOptions.push('KG');
-      renderItemsTable([]);
-      renderTokenItemsTable([]);
+      renderTokenItemsTable(existingItems);
+      document.querySelectorAll('#itemsTable .service').forEach(function(select){
+        var selected=select.value;
+        var choices=serviceOptions.slice();
+        if(selected&&choices.indexOf(selected)<0)choices.unshift(selected);
+        select.innerHTML='<option value="">Select</option>'+choices.map(function(code){
+          return '<option value="'+escapeHtml(code)+'"'+(code===selected?' selected':'')+'>'+escapeHtml(code)+'</option>';
+        }).join('');
+      });
+      var missing=['WI','WF','DC','IR'].filter(function(code){return !resolveVoiceService_(code,false);});
+      document.getElementById('tokenBackendStatus').textContent=tokenServicesReady_?
+        'Backend services loaded.'+(missing.length?' Missing in Services sheet: '+missing.join(', ')+'.':' WI / WF / DC / IR ready.'):
+        'Backend returned no services. Check the Services sheet and Apps Script execution errors.';
+    }
+    function loadTokenServices_(){
+      if(!currentUser||!getActiveSessionToken()){
+        document.getElementById('tokenBackendStatus').textContent='Please login before loading services.';return;
+      }
+      document.getElementById('tokenBackendStatus').textContent='Loading services from backend…';
+      google.script.run.withSuccessHandler(setServices).withFailureHandler(function(e){
+        tokenServicesReady_=false;
+        document.getElementById('tokenBackendStatus').textContent='Backend services failed: '+(e.message||e);
+      }).getServices(getActiveSessionToken());
     }
 
     function lookupCustomer() {
