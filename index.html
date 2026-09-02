@@ -591,7 +591,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.8</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v1.9</small></h2>
     <div id="tokenBackendStatus" class="info" role="status"></div>
     <button class="btn" type="button" onclick="loadTokenServices_()">Reload services</button>
     <div class="voice-token-panel" id="customerVoicePanel">
@@ -923,7 +923,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(!obj.customerName) return alert('Customer Name required.');
       if(!/^\d{10}$/.test(obj.phone)) return alert('Phone must be exactly 10 digits.');
       if(!obj.deliveryDate) return alert('Delivery Date required.');
-      if(!items.length || items.some(function(it){ return !it.service || !it.item || !Number.isInteger(Number(it.qty)) || Number(it.qty)<=0 || (it.service==='KG' && !(Number(it.weight)>0)); })) {
+      if(!items.length || items.some(function(it){ return !it.service || !it.item || !Number.isInteger(Number(it.qty)) || Number(it.qty)<=0 || (/^(KG|KG WF)$/.test(it.service) && !(Number(it.weight)>0)); })) {
         return alert('Enter valid Service, Item and Quantity; enter Weight for KG items.');
       }
 
@@ -992,7 +992,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function handleTokenServiceChange(select){
       var row = select.closest('tr');
       if(!row) return;
-      var isKg = String(select.value||'').trim().toUpperCase() === 'KG';
+      var isKg = /^(KG|KG WF)$/.test(String(select.value||'').trim().toUpperCase());
       var weight = row.querySelector('.token-weight');
       weight.disabled = !isKg;
       weight.style.display = isKg ? 'block' : 'none';
@@ -1125,7 +1125,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:mobail|mobyle)\b|मोबाइल/gi,'mobile']
       ];
       aliases.forEach(function(pair){ value = value.replace(pair[0], pair[1]); });
-      return value.replace(/\s+/g,' ').trim();
+      return value.replace(/\bkg\s+WF\b/gi,'KG WF').replace(/\s+/g,' ').trim();
     }
 
 
@@ -1275,14 +1275,23 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       text=text.replace(/(\d+(?:\.\d+)?)\s*kg\s*(\d+(?:\.\d+)?)\s*(?:grams?|gm|g|ग्राम)(?=\s|$|[,;।])/gi,function(_,kg,g){return String(Math.round((Number(kg)+Number(g)/1000)*1000)/1000)+' kg';});
       text=text.replace(/(\d+(?:\.\d+)?)\s*(?:grams?|gm|g|ग्राम)(?=\s|$|[,;।])/gi,function(_,g){return String(Number(g)/1000)+' kg';});
       text=text.replace(/(\d)(kg)(?=\s|$|[,;।])/gi,'$1 $2').replace(/\bkg(?:\s+kg)+\b/gi,'kg');
-      var serviceNames=['WI','WF','DC','IR','SH','BLK','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
+      var serviceNames=['KG WF','WI','WF','DC','IR','SH','BLK','KG'].concat(serviceOptions).filter(Boolean).sort(function(a,b){return b.length-a.length;}).map(function(x){return String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');});
       var services=serviceNames.join('|'),rows=[],issues=[];
-      // A completed service may also delimit adjacent rows without a spoken "और".
-      text=text.replace(/\b(WI|WF|DC|IR|SH|BLK)\s+(?=\d+\s+[^\d])/gi,'$1 ; ');
-      var chunks=text.split(/(?:^|\s)(?:और|aur|and)(?=\s|$)|[,;।\n]/i);
+      // Only an explicit spoken separator starts a row. Repeated quantities revise it.
+      text=text.replace(/\b(KG WF|WI|WF|DC|IR|SH|BLK)\s+(?=\d+(?:\s|$))/gi,function(all,code){return /^KG WF$/i.test(code)?all:code+' ~ ';});
+      text=text.replace(/\s+(\d+)\s+(?=(?:shirts?|pants?|trousers?|jeans|blankets?|shoe|शर्ट|पैंट|कंबल)\b)/gi,' ~ $1 ');
+      var chunks=text.split(/(?:^|\s)(?:और|aur|and)(?=\s|$)/i);
       var leading=/^\s*(?:और|aur|and)(?=\s|$)/i.test(text),trailing=/(?:^|\s)(?:और|aur|and)\s*$/i.test(text);
       chunks.forEach(function(chunk){
-        chunk=voiceClean_(chunk);if(!chunk)return;
+        chunk=voiceClean_(chunk).replace(/[,;।\n]+/g,' ');if(!chunk)return;
+        var revisions=chunk.split(/\s*~\s*/).filter(function(part){return part.trim();}),revised=revisions.shift();
+        revisions.forEach(function(part){
+          if(/^\d+$/.test(part.trim()))revised=revised.replace(/^\d+/,part.trim());
+          else{
+            var previous=revised.match(/\b(KG WF|WI|WF|DC|IR|SH|BLK|KG)\s*$/i);
+            revised=part+(previous&&!/\b(KG WF|WI|WF|DC|IR|SH|BLK|KG)\b/i.test(part)?' '+previous[1]:'');
+          }
+        });chunk=revised.trim();
         var qtyMatch=chunk.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
         if(!qtyMatch){issues.push('Incomplete item: '+chunk);return;}
         var qty=Number(qtyMatch[1]),body=qtyMatch[2],service='',weight=0,item=body;
@@ -1292,11 +1301,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));
           item=body.slice(0,serviceMatch.index).trim();
           var after=voiceClean_(serviceMatch[2]).replace(/^(?:hai|hain|है|हैं)\s*/i,'');
-          if(/^(?:WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:WI|WF|DC|IR|SH|BLK|KG))*$/i.test(after)){
-            serviceMatch[1]=after.trim().split(/\s+/).pop();
+          if(/^(?:KG WF|WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:KG WF|WI|WF|DC|IR|SH|BLK|KG))*$/i.test(after)){
+            serviceMatch[1]=after.match(/KG WF|WI|WF|DC|IR|SH|BLK|KG/gi).pop();
             service=resolveVoiceService_(serviceMatch[1],/^kg$/i.test(serviceMatch[1]));after='';
           }
-          if(/^kg$/i.test(serviceMatch[1])){
+          if(/^kg(?: wf)?$/i.test(serviceMatch[1])){
             var beforeWeight=item.match(/\s+(\d+(?:\.\d+)?)$/);
             var afterWeight=after.match(/^(?:(?:weight|वजन|वज़न|वेट)\s*[:\-]?\s*)?(\d+(?:\.\d+)?)(?:\s*kg)?/i);
             if(beforeWeight){weight=Number(beforeWeight[1]);item=item.slice(0,beforeWeight.index);}
@@ -1400,9 +1409,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       tokenVoiceLastParsed_=null;
       tokenVoiceDraft_={items:getTokenItems(),name:document.getElementById('tokenCustomerName').value,phone:document.getElementById('tokenPhone').value,deliveryDate:document.getElementById('tokenDeliveryDate').value,remark:document.getElementById('tokenRemark').value,pending:tokenVoicePending_};
     }
-    function mergeVoiceItems_(base, incoming){
+    function mergeVoiceItems_(base, incoming, leadingSeparator){
       var rows=base.map(function(it){return Object.assign({},it);});
-      incoming.forEach(function(it){
+      incoming.forEach(function(it,index){
+        if(index===0 && !leadingSeparator && rows.length && !voiceIsBlankItem_(it) && !voiceIsBlankItem_(rows[rows.length-1])){
+          var old=rows[rows.length-1];rows[rows.length-1]=Object.assign({},old,it,{service:it.service||old.service});return;
+        }
         if(rows.length&&voiceIsBlankItem_(rows[rows.length-1])){
           if(!voiceIsBlankItem_(it))rows[rows.length-1]=Object.assign({},it);
         }else rows.push(Object.assign({},it));
@@ -1415,7 +1427,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       document.getElementById('tokenPhone').value=data.fields.phone?data.phone:base.phone;
       document.getElementById('tokenDeliveryDate').value=data.deliveryDate||base.deliveryDate;
       document.getElementById('tokenRemark').value=data.fields.remark?data.remark:base.remark;
-      renderTokenItemsTable(mergeVoiceItems_(base.items,data.items));
+      renderTokenItemsTable(mergeVoiceItems_(base.items,data.items,data.leadingSeparator));
       calcTokenTotals();
     }
     function applyVoiceTokenSpeech_(text, finalResult){
@@ -1424,8 +1436,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
       if(tokenVoiceScope_==='items'){
         var command=voiceClean_(normalizeVoiceAliases_(text)).replace(/^(?:service|सर्विस|सेवा)\s+/i,'').trim();
-        if(/^(?:WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:WI|WF|DC|IR|SH|BLK|KG))*$/i.test(command)){
-          var code=command.split(/\s+/).pop().toUpperCase(),selected=resolveVoiceService_(code,code==='KG'),target=base.items.length-1;
+        if(/^(?:KG WF|WI|WF|DC|IR|SH|BLK|KG)(?:\s+(?:KG WF|WI|WF|DC|IR|SH|BLK|KG))*$/i.test(command)){
+          var code=command.match(/KG WF|WI|WF|DC|IR|SH|BLK|KG/gi).pop().toUpperCase(),selected=resolveVoiceService_(code,code==='KG'),target=base.items.length-1;
           while(target>=0&&!base.items[target].item)target--;
           data.items=[];data.issues=[];data.pending=null;
           if(target<0)data.issues=['पहले quantity और item भरें, फिर service बोलें।'];
@@ -1433,17 +1445,17 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           else{
             base=Object.assign({},base,{items:base.items.map(function(row){return Object.assign({},row);})});
             base.items[target].service=selected;
-            if(code!=='KG')base.items[target].weight=0;
+            if(!/^KG(?: WF)?$/.test(code))base.items[target].weight=0;
             else if(!(Number(base.items[target].weight)>0))data.issues=['KG चुना गया। अब वजन बोलें, जैसे 3 किलो 400 ग्राम।'];
           }
         }
         var weightOnly=voiceNumberText_(normalizeVoiceAliases_(text)).replace(/(\d)\s+(?:hundred|सौ)(?=\s|$)/gi,function(_,n){return String(Number(n)*100);}).trim();
-        if(/^(?:kg\s+)?\d+(?:\.\d+)?\s*kg(?:\s+\d+(?:\.\d+)?\s*(?:grams?|gm|g|ग्राम))?(?:\s+kg)*$/i.test(weightOnly)){
+        if(/^(?:kg(?: wf)?\s+)?\d+(?:\.\d+)?\s*kg(?:\s+\d+(?:\.\d+)?\s*(?:grams?|gm|g|ग्राम))?(?:\s+kg)*$/i.test(weightOnly)){
           var weightResult=voiceReadItems_('1 Weight '+weightOnly),last=base.items.length-1;
           while(last>=0&&!base.items[last].item)last--;
           if(last>=0&&base.items[last].item&&weightResult.items.length===1&&weightResult.items[0].weight>0){
             base=Object.assign({},base,{items:base.items.map(function(row){return Object.assign({},row);})});
-            base.items[last].service=resolveVoiceService_('KG',true);base.items[last].weight=weightResult.items[0].weight;
+            base.items[last].service=resolveVoiceService_(/KG WF/i.test(weightOnly)||base.items[last].service==='KG WF'?'KG WF':'KG',false);base.items[last].weight=weightResult.items[0].weight;
             data.items=[];data.issues=weightResult.issues;
           }else data.issues=['पहले quantity और item बोलें, फिर वजन बताएँ।'];
         }
@@ -1455,7 +1467,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       tokenVoiceLastParsed_=data;
       document.getElementById(tokenVoiceScope_==='items'?'voiceItemsTranscript':'voiceTokenTranscript').textContent=text;
       if(tokenVoiceScope_==='items'){
-        renderTokenItemsTable(mergeVoiceItems_(base.items,data.items));calcTokenTotals();
+        var qtyOnly=voiceNumberText_(text).trim().match(/^(?:quantity\s+|qty\s+|क्वांटिटी\s+|मात्रा\s+)?(?:\d+\s+)*(\d+)$/i);
+        if(qtyOnly){
+          var target=base.items.length-1;while(target>=0&&!base.items[target].item)target--;
+          data.items=[];data.issues=[];
+          if(target>=0&&Number(qtyOnly[1])>0){base=Object.assign({},base,{items:base.items.map(function(r){return Object.assign({},r);})});base.items[target].qty=Number(qtyOnly[1]);}
+          else data.issues=['पहले item भरें और positive quantity बोलें।'];
+        }
+        renderTokenItemsTable(mergeVoiceItems_(base.items,data.items,data.leadingSeparator));calcTokenTotals();
       }else if(tokenVoiceScope_==='details'){
         if(data.fields.name)document.getElementById('tokenCustomerName').value=data.name;
         if(data.fields.phone)document.getElementById('tokenPhone').value=data.phone;
@@ -1483,7 +1502,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       var name = document.getElementById('tokenCustomerName').value.trim();
       var phone = document.getElementById('tokenPhone').value.trim();
       var items = getTokenItemsForSave_();
-      if(!name || !/^\d{10}$/.test(phone) || !items.length || items.some(function(it){ return !it.item||!it.service||!Number.isInteger(Number(it.qty))||it.qty<=0||(it.service==='KG'&&!(Number(it.weight)>0)); })){
+      if(!name || !/^\d{10}$/.test(phone) || !items.length || items.some(function(it){ return !it.item||!it.service||!Number.isInteger(Number(it.qty))||it.qty<=0||(/^(KG|KG WF)$/.test(it.service)&&!(Number(it.weight)>0)); })){
         document.getElementById('voiceTokenStatus').textContent = 'Some details were not understood. Correct the form or speak again.';
         document.getElementById('voiceTokenBtn').disabled = false;
         return;
@@ -1703,10 +1722,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(Boolean) : [];
       tokenServicesReady_=serviceOptions.length>0;
       // These are the owner's confirmed token service codes, not invented prices.
-      if(tokenServicesReady_)['WI','WF','DC','IR','SH','BLK','KG'].forEach(function(code){
+      if(tokenServicesReady_)['WI','WF','DC','IR','SH','BLK','KG','KG WF'].forEach(function(code){
         if(!serviceOptions.some(function(s){return s.toUpperCase()===code;}))serviceOptions.push(code);
       });
-      if(!serviceOptions.some(function(s){ return String(s).trim().toUpperCase()==='KG'; })) serviceOptions.push('KG');
+      if(!serviceOptions.some(function(s){ return /^(KG|KG WF)$/.test(String(s).trim().toUpperCase()); })) serviceOptions.push('KG');
       renderTokenItemsTable(existingItems);
       document.querySelectorAll('#itemsTable .service').forEach(function(select){
         var selected=select.value;
@@ -1848,7 +1867,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       document.getElementById('itemsTable').innerHTML = html;
       document.querySelectorAll('#itemsTable .service').forEach(function(select){
         let row = select.closest('tr');
-        let isKg = select.value.trim().toUpperCase()==='KG';
+        let isKg = /^(KG|KG WF)$/.test(select.value.trim().toUpperCase());
         row.querySelector('.qty').disabled = false;
         let weight = row.querySelector('.weight');
         weight.disabled = !isKg;
@@ -1862,14 +1881,14 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       let rate = +row.querySelector('.rate').value || 0;
       let qty = +row.querySelector('.qty').value || 0;
       let weight = +row.querySelector('.weight').value || 0;
-      let isKg = row.querySelector('.service').value.trim().toUpperCase() === 'KG';
+      let isKg = /^(KG|KG WF)$/.test(row.querySelector('.service').value.trim().toUpperCase());
       row.querySelector('.amt').value = Math.round(rate * (isKg ? weight : qty));
       calcTotal();
     }
 
     function handleServiceChange(select) {
       let row = select.closest('tr');
-      let isKg = select.value.trim().toUpperCase()==='KG';
+      let isKg = /^(KG|KG WF)$/.test(select.value.trim().toUpperCase());
       let qty = row.querySelector('.qty');
       let weight = row.querySelector('.weight');
       qty.disabled = false;
@@ -1933,7 +1952,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       else if (new Date(order.deliveryDate) < new Date(order.orderDate)) error = "Delivery date cannot be before order date.";
       else if (!order.customerName) error = "Customer Name required.";
       else if (order.items.length === 0 || order.items.every(function(i){ return !i.service && !i.item; })) error = "At least one item is required.";
-      else if (order.items.some(function(i){ return String(i.service).toUpperCase()==='KG' && !(Number(i.weight)>0); })) error = "Weight is required for KG service.";
+      else if (order.items.some(function(i){ return /^(KG|KG WF)$/.test(String(i.service).toUpperCase()) && !(Number(i.weight)>0); })) error = "Weight is required for KG service.";
       if (!error && order.items.some(function(i){ return String(i.rate).trim()==='' || !Number.isFinite(Number(i.rate)) || Number(i.rate)<0; })) error = "Enter a valid rate for every item in Book Order.";
       if (error) {
         document.getElementById('orderError').textContent = error;
