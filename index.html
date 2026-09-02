@@ -591,7 +591,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.0</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.1</small></h2>
     <div class="voice-token-panel" id="guidedVoicePanel">
       <h3>सवाल-जवाब से Token भरें</h3>
       <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
@@ -1112,6 +1112,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function normalizeVoiceAliases_(text){
       var value = String(text||'').replace(/(\d)(?=kgs?\b)/gi,'$1 ').replace(/\bkg\s*-\s*gram\b/gi,'kg');
       var aliases = [
+        // Recognizer may drop the K in "KG Fold"; only accept G before Fold.
+        [/\bg\s+fold\b/gi,'KG WF'],
         [/\b(?:w|dablu|dabloo|dab[lw]oo|double\s*u)\s*\.?\s*(?:i|aai|ai|eye)\b|(?:डब्ल्यू|डब्लू|डबल्यू|डबलू|डबल यू|डब्ल्यु|डबल्यु)\s*(?:आई|आइ|ई)/gi,'WI'],
         [/\bw\s*\.?\s*f\b|डब्ल्यू\s*एफ/gi,'WF'],
         [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?fold(?:ing)?\b|(?:वॉश|वाश|वॉस)\s*(?:(?:एंड|एण्ड|और|&)\s*)?फोल्ड/gi,'WF'],
@@ -1130,7 +1132,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\bi\s*\.?\s*r\b|आई\s*आर/gi,'IR'],
         [/\b(?:(?:only|just|khali|sirf)\s+)?(?:iron(?:ing)?|press(?:ing)?|istri|istree)(?:\s+(?:press|iron(?:ing)?))?(?:\s+(?:karna|karo|kar\s*do))?(?:\s+hai)?\b/gi,'IR'],
         [/(?:(?:खाली|सिर्फ|केवल)\s*)?(?:आयरनिंग|आयरन|प्रेस|प्रैस|इस्त्री|इस्तरी)(?:\s*(?:प्रेस|आयरनिंग|आयरन))?(?:\s*(?:करना|करो|कर\s*दो))?(?:\s*है)?/g,'IR'],
-        [/\b(?:k\s*\.?\s*g\.?|kgs?|kilo(?:\s*gram)?s?)\b|के\s*\.?\s*जी\.?|केज|किलो(?:\s*ग्राम)?/gi,'kg'],
+        [/\b(?:k\s*\.?\s*g\.?|kgs?|(?:kay|key|ke)\s*(?:gee|jee|ji)|keji|kilo(?:\s*gram)?s?)\b|के\s*\.?\s*(?:जी|जि|गी)\.?|केज|किलो(?:\s*ग्राम)?/gi,'kg'],
         [/\b(?:s\s*h|shoe[s]?\s*clean(?:ing)?)\b|एस\s*एच|शू(?:ज़|ज)?\s*क्लीनिंग|जूते\s*की\s*सफाई/gi,'SH'],
         [/\b(?:sooj|jute|joote|joota|shoes?)\b|जूते|जूता|जुते|शूज़|शूज|शू/gi,'shoe'],
         [/\bb\s*l\s*k\b|बी\s*एल\s*के/gi,'BLK'],
@@ -1151,8 +1153,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     function resolveVoiceService_(spoken, isKg){
       var cleaned = normalizeVoiceAliases_(spoken).toLowerCase().replace(/\b(ki|ka|ke|me|mein|service|hai|hain)\b|की|का|के|में|सर्विस|हैं|है/g,' ').replace(/\s+/g,' ').trim();
+      cleaned=cleaned.replace(/[.,।!?]/g,' ').split(/\s+/).filter(function(word){return !/^(?:karna|karni|karo|chahiye|chahie|please|kar|do|कीजिए|करना|करनी|करो|चाहिए|कर|दो|करिये|करिए)$/.test(word);}).join(' ').trim();
+      var repeated=cleaned.toUpperCase().match(/KG WF|WI|DC|IR|SH|KG/g);
+      if(repeated&&repeated.join(' ')===cleaned.toUpperCase()&&repeated.every(function(c){return c===repeated[0];}))cleaned=repeated[0].toLowerCase();
       if(/^(grams?|ग्राम)$/.test(cleaned))cleaned='kg';
       var code = isKg ? 'KG' : /^(wi|wash iron|wash & iron)$/.test(cleaned) ? 'WI' : /^(wf|wash fold|kg wf)$/.test(cleaned) ? 'KG WF' : /^(dc|dry clean|dry cleaning)$/.test(cleaned) ? 'DC' : cleaned.toUpperCase();
+      if(code==='BLK')return '';
       var exact=serviceOptions.find(function(opt){return String(opt).trim().toUpperCase()===code;});
       if(exact)return exact;
       return serviceOptions.find(function(opt){
@@ -1338,7 +1344,6 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         item=item.replace(/\s+(?:hai|hain|ki|ka|ke|है|हैं|की|का|के)\s*$/i,'').trim();
         if(!serviceMatch){
           if(/\bshoe\b/i.test(item))service=resolveVoiceService_('SH',false);
-          else if(/\bblankets?\b|कम्बल/i.test(item))service=resolveVoiceService_('BLK',false);
         }
         if(!Number.isInteger(qty)||qty<=0)issues.push('Quantity must be a positive whole number.');
         if(!service)issues.push('Select the service for: '+item);
@@ -1743,10 +1748,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     function setServices(opts) {
       var existingItems=getTokenItems();
-      serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(function(s){return s&&s.toUpperCase()!=='WF';}) : [];
+      serviceOptions = Array.isArray(opts) ? opts.map(function(s){return String(s||'').trim();}).filter(function(s){return s&&!/^(WF|BLK)$/i.test(s);}) : [];
       tokenServicesReady_=serviceOptions.length>0;
       // These are the owner's confirmed token service codes, not invented prices.
-      if(tokenServicesReady_)['WI','DC','IR','SH','BLK','KG','KG WF'].forEach(function(code){
+      if(tokenServicesReady_)['WI','DC','IR','SH','KG','KG WF'].forEach(function(code){
         if(!serviceOptions.some(function(s){return s.toUpperCase()===code;}))serviceOptions.push(code);
       });
       if(!serviceOptions.some(function(s){ return /^(KG|KG WF)$/.test(String(s).trim().toUpperCase()); })) serviceOptions.push('KG');
@@ -2624,8 +2629,8 @@ var guidedVoice_ = {
     this.cancelInput();this.promptId='';this.listening=true;this.receive(answer);
   },
   yesNo:function(text){
-    var s=voiceClean_(String(text).toLowerCase());
-    if(/^(?:हाँ|हां|जी हाँ|जी हां|हां सेव करो|हाँ सेव करो|हां सेव कर दो|हाँ सेव कर दो|सेव करो|yes|yes save|yes save it|haan|han|save|save token|जी)$/.test(s))return true;
+    var s=voiceClean_(String(text).toLowerCase()).replace(/[.!?।]+$/g,'').trim();
+    if(/^(?:हाँ|हां|जी हाँ|जी हां|हां सेव करो|हाँ सेव करो|हां सेव कर दो|हाँ सेव कर दो|सेव करो|yes|yes save|yes save it|haa|haan|han|ha|save|save token|जी)$/.test(s))return true;
     if(/^(?:नहीं|नही|ना|बस|नहीं और|no|no more|nahi|nahin|bas)$/.test(s))return false;
     return null;
   },
@@ -2698,7 +2703,7 @@ var guidedVoice_ = {
     }
     if(state==='service'){
       var service=resolveVoiceService_(text,false);
-      if(!service){this.ask('service','Service समझ नहीं आई। वॉश आयरन, प्रेस, ड्राई क्लीन, किलो या फोल्ड बोलें।');return;}
+      if(!service){this.ask('service','मैंने सुना '+text+'। Service समझ नहीं आई। वॉश आयरन, प्रेस, ड्राई क्लीन, के जी या फोल्ड बोलें।');return;}
       if(!rows[this.itemIndex]){this.ask('item','कपड़े की quantity और नाम दोबारा बोलें।');return;}
       rows[this.itemIndex].service=service;if(!/^(KG|KG WF)$/.test(service))rows[this.itemIndex].weight=0;
       this.render(rows);this.nextItemField();return;
@@ -2713,6 +2718,7 @@ var guidedVoice_ = {
     }
     if(state==='more'){
       var more=this.yesNo(text);if(/^(और|aur)$/i.test(text))more=true;
+      if(/^(?:(?:yes|haa|haan|han|ha|हाँ|हां)\s+)?(?:jodna hai|jodna|jodo|aur jodna hai|add|add more|जोड़ना है|जोड़ना|जोड़ो|जोडना है|और जोड़ना है)[.!?।]?$/i.test(text))more=true;
       if(more===true){this.itemIndex=rows.length;this.ask('item','अगले कपड़े की quantity, नाम और service बोलें।');}
       else if(more===false)this.ask('remark','कोई रिमार्क या खास निर्देश हैं? नहीं हों तो नहीं बोलें।');
       else this.ask('more','और कपड़े जोड़ने हैं? हाँ या नहीं बोलें।');return;
