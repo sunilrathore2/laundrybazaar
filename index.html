@@ -591,17 +591,25 @@
     <h2>Voice Token / Preliminary Order</h2>
     <div class="voice-token-panel">
       <div class="voice-token-actions">
-        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken()">Start Voice Token</button>
+        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')">🎤 Customer Details</button>
         <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
         <span id="voiceTokenStatus" class="info">Hindi, English and Hinglish supported.</span>
       </div>
-      <div id="voiceTokenTranscript">बोलें: फोन 9876543210, नाम सुनील, डिलीवरी डेट 5 सितंबर 2026, 5 शर्ट वॉश एंड आयरन और 2 शर्ट DC और 2 ब्लैंकेट 4.2 केजी। “और” = नई row। अंत में जाँचकर Save Token दबाएँ या “टोकन सेव करो” बोलें।</div>
+      <div id="voiceTokenTranscript">बोलें: फोन 9876543210, नाम सुनील, डिलीवरी डेट 5 सितंबर 2026। Items के लिए नीचे वाला 🎤 button दबाएँ। समाप्त होने पर Stop दबाएँ।</div>
     </div>
     <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly><button class="btn" onclick="newToken()">New</button></div>
     <div class="form-row"><label>Token Date:</label><input type="date" id="tokenDate"></div>
     <div class="form-row"><label>Phone:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
     <div class="form-row"><label>Name:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
     <div class="form-row"><label>Delivery Date:</label><input type="date" id="tokenDeliveryDate"></div>
+    <div class="voice-token-panel">
+      <div class="voice-token-actions">
+        <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')">🎤 Items</button>
+        <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
+        <span id="voiceItemsStatus" class="info">बोलें: 5 शर्ट WI और 2 शर्ट DC। लंबे pause के बाद भी बोल सकते हैं।</span>
+      </div>
+      <div id="voiceItemsTranscript" style="overflow-wrap:anywhere"></div>
+    </div>
     <div id="tokenItemsTable" class="table-holder"></div>
     <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">Add Item</button>
     <div class="form-row"><label>Total Quantity:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
@@ -988,6 +996,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     function stopVoiceToken(){
+      tokenVoiceEpoch_++;tokenVoiceContinuous_=false;
+      voiceButtons_(false);
+      voiceStatus_('Voice stopped.');
       if(tokenVoiceActive_ && tokenVoiceLastParsed_)tokenVoicePending_=tokenVoiceLastParsed_.pending;
       tokenVoiceActive_=false;tokenVoiceDraft_=null;
       if(voiceTokenRecognition) try{ voiceTokenRecognition.abort(); } catch(e){}
@@ -1005,79 +1016,43 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       document.getElementById('voiceTokenStatus').textContent = 'Voice stopped.';
     }
 
-    function startVoiceToken(){
-      var status = document.getElementById('voiceTokenStatus');
-      
-      if(/LaundryBazaarAndroid/i.test(navigator.userAgent||'')){
-        stopVoiceToken();
-        beginVoiceTokenDraft_();
-        document.getElementById('voiceTokenBtn').disabled = true;
-        document.getElementById('voiceTokenStopBtn').disabled = false;
-        status.textContent = 'Connecting to Android microphone...';
-        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('token'); else window.onAndroidVoiceError('This Android app needs native voice support.');
-        return;
-      }
-      
-      if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function'){
-        stopVoiceToken();
-        beginVoiceTokenDraft_();
-        document.getElementById('voiceTokenBtn').disabled = true;
-        document.getElementById('voiceTokenStopBtn').disabled = false;
-        status.textContent = 'Connecting to Android microphone...';
-        if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition === 'function') window.AndroidVoice.startRecognition('token'); else window.onAndroidVoiceError('This Android app needs native voice support.');
-        return;
-      }
-
-
-      var Recognition = voiceRecognitionClass_();
-      if(!Recognition){ 
-        status.textContent = 'Speech recognition not supported in this browser. Use Chrome directly.';
-        alert('Voice recognition is not supported in this browser. Please open in Google Chrome directly.');
-        return; 
-      }
-      
+    function startVoiceToken(scope){
       stopVoiceToken();
-      beginVoiceTokenDraft_();
-      document.getElementById('voiceTokenBtn').disabled = true;
-      document.getElementById('voiceTokenStopBtn').disabled = false;
-      status.textContent = 'Listening... Speak Hindi, English or Hinglish.';
-      
-      try {
-        var recognition = new Recognition();
-        voiceTokenRecognition = recognition;
-        recognition.lang = 'hi-IN';
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 3;
-        
-        recognition.onresult = function(event){
-          var text='';for(var i=0;i<event.results.length;i++)text+=event.results[i][0].transcript+' ';
-          applyVoiceTokenSpeech_(text.trim(),event.results[event.results.length-1].isFinal);
-        };
-        
-        recognition.onerror = function(event){
-          var msg = 'Voice error: ' + event.error;
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            msg = 'Microphone permission denied. Allow mic access in browser site settings.';
-          } else if (event.error === 'no-speech') {
-            msg = 'No speech detected. Tap Start Voice Token to retry.';
-          }
-          status.textContent = msg;
-          document.getElementById('voiceTokenBtn').disabled = false;
-          document.getElementById('voiceTokenStopBtn').disabled = true;
-        };
-        
-        recognition.onend = function(){ 
-          voiceTokenRecognition = null; 
-          document.getElementById('voiceTokenBtn').disabled = false;
-          document.getElementById('voiceTokenStopBtn').disabled = true;
-        };
-        
-        recognition.start();
-      } catch(e) {
-        status.textContent = 'Unable to start microphone: ' + e.message;
-        document.getElementById('voiceTokenBtn').disabled = false;
-        document.getElementById('voiceTokenStopBtn').disabled = true;
+      tokenVoiceScope_=scope||'details';tokenVoicePending_=null;
+      beginVoiceTokenDraft_();tokenVoiceContinuous_=true;voiceButtons_(true);
+      var epoch=tokenVoiceEpoch_;
+      voiceStatus_('Listening… Long pauses allowed. Tap Stop when finished.');
+      if(window.AndroidVoice && typeof window.AndroidVoice.startRecognition==='function'){
+        window.AndroidVoice.startRecognition('token');return;
       }
+      var Recognition=voiceRecognitionClass_(),committed='';
+      if(!Recognition){window.onAndroidVoiceError('Speech recognition unavailable. Use the Android app.');return;}
+      function listen(){
+        if(!tokenVoiceActive_||epoch!==tokenVoiceEpoch_)return;
+        var recognition=new Recognition(),finalText='';
+        voiceTokenRecognition=recognition;
+        recognition.lang='hi-IN';recognition.interimResults=true;recognition.continuous=true;
+        recognition.onresult=function(event){
+          if(epoch!==tokenVoiceEpoch_||!tokenVoiceActive_)return;
+          var all='';finalText='';
+          for(var i=0;i<event.results.length;i++){
+            all+=event.results[i][0].transcript+' ';
+            if(event.results[i].isFinal)finalText+=event.results[i][0].transcript+' ';
+          }
+          applyVoiceTokenSpeech_((committed+' '+all).trim(),event.results[event.results.length-1].isFinal);
+        };
+        recognition.onerror=function(event){
+          if(epoch!==tokenVoiceEpoch_)return;
+          if(event.error!=='no-speech'&&event.error!=='aborted')window.onAndroidVoiceError('Microphone: '+event.error+'. Please retry.');
+        };
+        recognition.onend=function(){
+          if(epoch!==tokenVoiceEpoch_||!tokenVoiceActive_)return;
+          committed=(committed+' '+finalText).trim();
+          setTimeout(listen,400);
+        };
+        try{recognition.start();}catch(e){window.onAndroidVoiceError(e.message);}
+      }
+      listen();
     }
 
     function normalizeVoiceDigits_(text){
@@ -1330,6 +1305,19 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     var tokenVoiceDraft_=null,tokenVoicePending_=null,tokenVoiceActive_=false,tokenVoiceLastParsed_=null;
+    var tokenVoiceScope_='token',tokenVoiceContinuous_=false,tokenVoiceEpoch_=0;
+    function voiceButtons_(active){
+      ['voiceToken','voiceItems'].forEach(function(id){
+        var selected=(id==='voiceItems')===(tokenVoiceScope_==='items');
+        var start=document.getElementById(id+'Btn'),stop=document.getElementById(id+'StopBtn');
+        if(start)start.disabled=active&&selected;
+        if(stop)stop.disabled=!(active&&selected);
+      });
+    }
+    function voiceStatus_(text){
+      var el=document.getElementById(tokenVoiceScope_==='items'?'voiceItemsStatus':'voiceTokenStatus');
+      if(el)el.textContent=text;
+    }
     function getTokenItemsForSave_(){return getTokenItems().filter(function(it){return !voiceIsBlankItem_(it);});}
     function beginVoiceTokenDraft_(){
       tokenVoiceActive_=true;
@@ -1358,10 +1346,26 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(!tokenVoiceActive_)return;
       if(!tokenVoiceDraft_)beginVoiceTokenDraft_();
       var base=tokenVoiceDraft_,data=parseVoiceToken_(text,base.pending);
+      if(tokenVoiceScope_==='details')data.items=[];
+      if(tokenVoiceScope_==='items'){
+        data.fields={};data.name=base.name;data.phone=base.phone;data.deliveryDate=base.deliveryDate;data.remark=base.remark;
+      }
       tokenVoiceLastParsed_=data;
-      document.getElementById('voiceTokenTranscript').textContent=text;
-      fillVoiceTokenForm_(data,base);
+      document.getElementById(tokenVoiceScope_==='items'?'voiceItemsTranscript':'voiceTokenTranscript').textContent=text;
+      if(tokenVoiceScope_==='items'){
+        renderTokenItemsTable(mergeVoiceItems_(base.items,data.items));calcTokenTotals();
+      }else if(tokenVoiceScope_==='details'){
+        if(data.fields.name)document.getElementById('tokenCustomerName').value=data.name;
+        if(data.fields.phone)document.getElementById('tokenPhone').value=data.phone;
+        if(data.deliveryDate)document.getElementById('tokenDeliveryDate').value=data.deliveryDate;
+      }else fillVoiceTokenForm_(data,base);
       if(!finalResult)return;
+      if(tokenVoiceContinuous_){
+        voiceStatus_(data.issues.length?data.issues.join(' '):'Listening… Pause allowed. Tap Stop when finished.');
+        if(data.fields.phone && /^\d{10}$/.test(data.phone) && !data.fields.name)lookupTokenCustomer();
+        if(data.saveRequested&&!data.issues.length&&!data.pending){stopVoiceToken();confirmVoiceToken_(text);}
+        return;
+      }
       tokenVoicePending_=data.pending;tokenVoiceDraft_=null;tokenVoiceActive_=false;
       document.getElementById('voiceTokenBtn').disabled=false;
       document.getElementById('voiceTokenStopBtn').disabled=true;
@@ -1446,6 +1450,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     }
 
     window.onAndroidVoicePartial = function(text){ applyVoiceTokenSpeech_(String(text||''),false); };
+    document.addEventListener('visibilitychange',function(){if(document.hidden&&tokenVoiceActive_)stopVoiceToken();});
     window.onAndroidVoiceResult = function(text, mode){
       text=String(text||'').trim();
       if(mode==='confirmation'){handleVoiceTokenConfirmation_(text);return;}
@@ -1453,6 +1458,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     };
 
     window.onAndroidVoiceError = function(message){
+      tokenVoiceContinuous_=false;tokenVoiceEpoch_++;voiceButtons_(false);voiceStatus_(String(message||'Voice stopped.'));
       tokenVoiceActive_=false;tokenVoiceDraft_=null;
       document.getElementById('voiceTokenStatus').textContent = String(message||'Android voice recognition failed.');
       document.getElementById('voiceTokenBtn').disabled = false;
