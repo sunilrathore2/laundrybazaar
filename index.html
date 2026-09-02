@@ -591,7 +591,8 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.2 — KG WF / No BLK</small></h2>
+    <h2>Voice Token / Preliminary Order <small style="font-size:11px">Voice v2.3 — KG WF / No BLK</small></h2>
+    <button class="btn" type="button" onclick="checkBackendConnection_()">Check backend connection</button><span id="backendConnectionStatus" role="status"></span>
     <div class="voice-token-panel" id="guidedVoicePanel">
       <h3>सवाल-जवाब से Token भरें</h3>
       <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
@@ -675,19 +676,23 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       if(name === 'then') return undefined;
       return function(){
         var args=Array.prototype.slice.call(arguments);
+        var stage='network';
         fetch(window.LB_API_URL, {
           method:'POST', redirect:'follow', credentials:'omit',
           headers:{'Content-Type':'text/plain;charset=utf-8'},
           body:JSON.stringify({api:'laundry-bazaar-v1',method:name,args:args})
         }).then(async function(response){
+          stage='response';
           if(!response.ok) throw new Error('API HTTP '+response.status+'. Check the Apps Script deployment.');
           var text=await response.text(), data;
           try{data=JSON.parse(text);}catch(_){throw new Error('Backend is not ready. Add GitHubAPI.gs and deploy a New version of the same web app with anonymous web access.');}
           if(!data || typeof data.ok !== 'boolean') throw new Error('Unexpected backend response.');
           if(!data.ok) throw new Error(data.error || 'Request failed.');
+          stage='callback';
           if(success) success(data.result,userObject);
         }).catch(function(error){
-          if(error instanceof TypeError) error=new Error('Cannot reach the backend. Check deployment access and connection. If saving, check the records before retrying; the request may have completed.');
+          if(stage==='network') error=new Error('Network/access failure calling '+String(name)+'. Check backend connection. No automatic retry was made.');
+          else if(stage==='callback') error=new Error('Backend replied successfully, but the page failed to display '+String(name)+': '+error.message+'. If saving, check records before retrying.');
           if(failure) failure(error,userObject);else alert(error.message);
         });
       };
@@ -698,6 +703,29 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 </script>
 
 <script>
+    function checkBackendConnection_(){
+      var el=document.getElementById('backendConnectionStatus');el.textContent='Checking…';
+      google.script.run.withSuccessHandler(function(r){el.textContent=r&&r.version==='2.3'?'Backend v2.3 connected.':'Backend version mismatch: deploy v2.3.';}).withFailureHandler(function(e){el.textContent=e.message||String(e);}).getBackendInfo();
+    }
+    function safeDisplayHtml_(html){
+      var template=document.createElement('template');template.innerHTML=String(html||'');
+      template.content.querySelectorAll('script,iframe,object,embed,base,meta,link,form').forEach(function(el){el.remove();});
+      template.content.querySelectorAll('*').forEach(function(el){
+        Array.from(el.attributes).forEach(function(a){
+          if(/^on/i.test(a.name)||a.name==='srcdoc'||(/^(href|src|action|formaction|xlink:href)$/i.test(a.name)&&/^\s*(?:javascript:|vbscript:|data:text\/html)/i.test(a.value)))el.removeAttribute(a.name);
+        });
+      });return template.innerHTML;
+    }
+    function bookingRequestId_(kind,obj){
+      var key='lbPending_'+kind+'_'+(currentUser&&currentUser.username||''),old;
+      var copy=JSON.parse(JSON.stringify(obj));delete copy.requestId;delete copy.orderNumber;delete copy.tokenNumber;
+      var fingerprint=JSON.stringify(copy);
+      try{old=JSON.parse(localStorage.getItem(key)||'null');}catch(e){}
+      if(old){if(old.fingerprint!==fingerprint)throw new Error('Previous save is unconfirmed. Restore its details and retry, or check records before clearing the pending request.');return old.id;}
+      var id=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2);
+      localStorage.setItem(key,JSON.stringify({id:id,fingerprint:fingerprint}));return id;
+    }
+    function clearBookingRequest_(kind){localStorage.removeItem('lbPending_'+kind+'_'+(currentUser&&currentUser.username||''));}
     function capitalizeWords(text) {
       if (!text || text.trim() === '') return '';
       return text.toString()
@@ -806,7 +834,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       applyRole(normalizedRole);
       google.script.run.withSuccessHandler(setLogo).getLogo(getActiveSessionToken());
       loadTokenServices_();
-      addNewOrder();
+      if(normalizedRole==='admin'||normalizedRole==='manager')addNewOrder();
       if(normalizedRole==='admin') loadTelegramSettings();
       if(normalizedRole==='delivery' || normalizedRole==='admin' || normalizedRole==='manager') { newToken(); loadTokens(); }
     }
@@ -943,9 +971,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         return alert('Enter valid Service, Item and Quantity; enter Weight for KG items.');
       }
 
+      try{obj.requestId=bookingRequestId_('token',obj);}catch(e){alert(e.message);return;}
       document.getElementById('saveTokenBtn').disabled = true;
       google.script.run
         .withSuccessHandler(function(n){
+          clearBookingRequest_('token');
           document.getElementById('tokenError').textContent = 'Token Saved: '+n+' | Status: Pending';
           if(typeof guidedVoice_!=='undefined')guidedVoice_.el('guidedQuestion').textContent='Token '+n+' save हो गया। नया customer हो तो शुरू करें दबाएँ।';
           document.getElementById('tokenError').className = 'success';
@@ -1882,7 +1912,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         <th>Service</th><th>Item</th><th>Rate</th><th>Qty</th><th>Amount</th><th></th></tr></thead><tbody>`;
       for (let i = 0; i < items.length; i++) {
         html += `<tr class="itemRow">
-          <td><select class="service" onchange="handleServiceChange(this)">${serviceOptions.map(function(opt){ return `<option ${items[i].service===opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`; }).join('')}</select></td>
+          <td><select class="service" onchange="handleServiceChange(this)"><option value="">Select service</option>${serviceOptions.map(function(opt){ return `<option ${items[i].service===opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`; }).join('')}</select></td>
           <td><div class="item-input-stack">
             <input class="item" type="text" value="${escapeHtml(items[i].item || '')}" autocomplete="off" oninput="capitalizeInput(this)">
             <input class="weight" type="number" value="${escapeHtml(items[i].weight || '')}" min="0" step="0.01" placeholder="Weight" aria-label="Weight" oninput="calcAmtRow(this)">
@@ -1990,8 +2020,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         return;
       }
       document.getElementById('orderError').textContent = "";
+      try{order.requestId=bookingRequestId_('order',order);}catch(e){document.getElementById('orderError').textContent=e.message;return;}
       document.getElementById('saveOrderBtn').disabled = true;
-      google.script.run.withSuccessHandler(function(){
+      google.script.run.withSuccessHandler(function(result){
+        if(!result||!result.success||!result.orderNumber)throw new Error('Unexpected save reply: deploy matching backend v2.3.');
+        document.getElementById('orderNumber').value=result.orderNumber;
+        clearBookingRequest_('order');
         document.getElementById('printInvoiceBtn').style.display = "inline-block";
         document.getElementById('printTagBtn').style.display = "inline-block";
         document.getElementById('remoteInvoiceBtn').style.display = "inline-block";
@@ -2171,7 +2205,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         <div class='form-row'>
           <button class='btn' onclick='saveDelivery(${obj.orderNumber})'>Save Delivery</button>
         </div></div>`;
-      container.innerHTML = html;
+      container.innerHTML = safeDisplayHtml_(html);
     }
 
     function setPaymentMode(mode, button) {
@@ -2189,10 +2223,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       const remarks = document.getElementById('deliveryRemarks').value;
       
       google.script.run.withSuccessHandler(function(msg){
-        document.getElementById('searchResult').innerHTML = `<div class="success">${msg}</div>`;
+        document.getElementById('searchResult').innerHTML = `<div class="success">${escapeHtml(msg)}</div>`;
         loadTokens();
       }).withFailureHandler(function(error){
-        document.getElementById('searchResult').innerHTML = `<div class="error">${error}</div>`;
+        document.getElementById('searchResult').innerHTML = `<div class="error">${escapeHtml(String(error))}</div>`;
       }).saveDelivery({ 
         orderNumber: orderNumber, 
         actualDate: actualDate, 
@@ -2290,10 +2324,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       google.script.run.withSuccessHandler(function(data){
         let html = '<table><tr><th>Delivery Date</th><th>Order No</th><th>Customer Name</th><th>Total Order Quantity</th><th>Status</th></tr>';
         data.forEach(function(r){
-          html += `<tr><td>${r.deliveryDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.totalQty}</td><td>${r.status}</td></tr>`;
+          html += `<tr><td>${escapeHtml(String(r.deliveryDate == null ? "" : r.deliveryDate))}</td><td>${escapeHtml(String(r.orderNumber == null ? "" : r.orderNumber))}</td><td>${escapeHtml(String(r.customerName == null ? "" : r.customerName))}</td><td>${r.totalQty}</td><td>${escapeHtml(String(r.status == null ? "" : r.status))}</td></tr>`;
         });
         html += '</table>';
-        document.getElementById('dailyOrdersReport').innerHTML = html;
+        document.getElementById('dailyOrdersReport').innerHTML = safeDisplayHtml_(html);
       }).generateReport('daily', null, null, getActiveSessionToken());
     }
     
@@ -2301,10 +2335,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
       google.script.run.withSuccessHandler(function(data){
         let html = '<table><tr><th>Delivery Date</th><th>Order No</th><th>Customer Name</th><th>Total Order Quantity</th><th>Status</th></tr>';
         data.forEach(function(r){
-          html += `<tr><td>${r.deliveryDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.totalQty}</td><td>${r.status}</td></tr>`;
+          html += `<tr><td>${escapeHtml(String(r.deliveryDate == null ? "" : r.deliveryDate))}</td><td>${escapeHtml(String(r.orderNumber == null ? "" : r.orderNumber))}</td><td>${escapeHtml(String(r.customerName == null ? "" : r.customerName))}</td><td>${r.totalQty}</td><td>${escapeHtml(String(r.status == null ? "" : r.status))}</td></tr>`;
         });
         html += '</table>';
-        document.getElementById('completedOrdersReport').innerHTML = html;
+        document.getElementById('completedOrdersReport').innerHTML = safeDisplayHtml_(html);
       }).generateCompletedOrderReport(getActiveSessionToken());
     }
     
@@ -2332,9 +2366,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         let html = '<table><tr><th>Actual Delivery</th><th>Order No</th><th>Customer</th><th>Paid Amount</th><th>Payment Mode</th><th>Remarks</th></tr>';
         rows.forEach(function(r){
           html += `<tr>
-            <td>${r.actualDate}</td>
-            <td>${r.orderNumber}</td>
-            <td>${r.customerName}</td>
+            <td>${escapeHtml(String(r.actualDate == null ? "" : r.actualDate))}</td>
+            <td>${escapeHtml(String(r.orderNumber == null ? "" : r.orderNumber))}</td>
+            <td>${escapeHtml(String(r.customerName == null ? "" : r.customerName))}</td>
             <td>\u20B9${Math.round(Number(r.amtPaid)||0)}</td>
             <td>${r.mode.charAt(0).toUpperCase() + r.mode.slice(1)}</td>
             <td style="max-width: 200px; word-wrap: break-word;">${r.remarks || '-'}</td>
@@ -2343,7 +2377,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         html += '</table>';
         html += `<p><b>Total Cash:</b> \u20B9${Math.round(totals.Cash||0)}</p>`;
         html += `<p><b>Total Paytm:</b> \u20B9${Math.round(totals.Paytm||0)}</p>`;
-        document.getElementById('deliveryReport').innerHTML = html;
+        document.getElementById('deliveryReport').innerHTML = safeDisplayHtml_(html);
       }).generateDeliveryReport(start, end, getActiveSessionToken());
     }
 
@@ -2358,17 +2392,17 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         let html = '<table><tr><th>Order No</th><th>Order Date</th><th>Delivery Date</th><th>Bill Amt</th><th>Paid Amt</th><th>Payment Mode</th><th>Remarks</th></tr>';
         data.forEach(function(r){
           html += `<tr>
-            <td>${r.orderNumber}</td>
-            <td>${r.orderDate}</td>
-            <td>${r.deliveryDate}</td>
+            <td>${escapeHtml(String(r.orderNumber == null ? "" : r.orderNumber))}</td>
+            <td>${escapeHtml(String(r.orderDate == null ? "" : r.orderDate))}</td>
+            <td>${escapeHtml(String(r.deliveryDate == null ? "" : r.deliveryDate))}</td>
             <td>${Math.round(Number(r.totalAmount)||0)}</td>
             <td>${Math.round(Number(r.amtPaid)||0)}</td>
-            <td>${r.mode}</td>
+            <td>${escapeHtml(String(r.mode == null ? "" : r.mode))}</td>
             <td style="max-width: 200px; word-wrap: break-word;">${r.remarks || '-'}</td>
           </tr>`;
         });
         html += '</table>';
-        document.getElementById('customerHistory').innerHTML = html;
+        document.getElementById('customerHistory').innerHTML = safeDisplayHtml_(html);
       }).generateCustomerHistory(phone, getActiveSessionToken());
     }
 
@@ -2388,11 +2422,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         let html = '<table><tr><th>Order Date</th><th>Order No</th><th>Customer Name</th><th>Delivery Date</th><th>Total Amount</th><th>Status</th><th>Total Quantity</th></tr>';
         data.orders.forEach(function(r){
           html += `<tr>
-            <td>${r.orderDate}</td><td>${r.orderNumber}</td><td>${r.customerName}</td><td>${r.deliveryDate}</td><td>${Math.round(Number(r.totalAmount)||0)}</td><td>${r.status}</td><td>${r.totalQty}</td>
+            <td>${escapeHtml(String(r.orderDate == null ? "" : r.orderDate))}</td><td>${escapeHtml(String(r.orderNumber == null ? "" : r.orderNumber))}</td><td>${escapeHtml(String(r.customerName == null ? "" : r.customerName))}</td><td>${escapeHtml(String(r.deliveryDate == null ? "" : r.deliveryDate))}</td><td>${Math.round(Number(r.totalAmount)||0)}</td><td>${escapeHtml(String(r.status == null ? "" : r.status))}</td><td>${r.totalQty}</td>
           </tr>`;
         });
         html += '</table>';
-        document.getElementById('orderDateReport').innerHTML = html;
+        document.getElementById('orderDateReport').innerHTML = safeDisplayHtml_(html);
         document.getElementById('orderDateTotals').innerHTML = `<div style="margin-top:10px; font-weight:bold;">
           Total Order Amount: \u20B9${Math.round(data.totalAmountSum||0)}<br>
           Total Order Quantity: ${data.totalQtySum}
