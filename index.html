@@ -592,7 +592,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>वॉइस टोकन <small style="font-size:11px">v2.6 हिन्दी / Lock / Rate</small></h2>
+    <h2>वॉइस टोकन <small style="font-size:11px">v2.7 Fast Confirm / Rate</small></h2>
     <details class="voice-token-panel" id="guidedVoicePanel" style="padding:6px;margin:4px 0">
       <summary>सवाल-जवाब / Voice confirmation</summary>
       <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
@@ -1353,8 +1353,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     function voiceBlankItem_(){return {service:'',item:'',qty:0,weight:0,rate:'',amt:0};}
     function readVoiceRate_(input){
       var text=voiceNumberText_(normalizeVoiceAliases_(input));
-      var pattern=/(?:\brate\s+)?(\d+(?:\.\d+)?)\s*(?:rupees|rupee|rs\.?|रुपये|रुपए|रुपया|रुपए|रूपये)(?:\s*(?:वाला|वाली|वाले|wala|wali|wale))?/i;
-      var m=text.match(pattern);return {rate:m?Number(m[1]):null,rest:m?text.replace(pattern,'').trim():text};
+      var pattern=/(?:(?:\brate|रेट|दर)\s*[:\-]?\s*(\d+(?:\.\d+)?)|(?:\b(\d+(?:\.\d+)?)\s*(?:rupees?|rs\.?|rupaye|rupaiye|rupya|रुपये|रुपए|रुपया|रूपये)(?:\s*(?:का|की|के|ka|ki|ke|वाला|वाली|वाले|wala|wali|wale))?)|(?:\b(\d+(?:\.\d+)?)\s*(?:का|की|के|ka|ki|ke|वाला|वाली|वाले|wala|wali|wale)))(?=\s*$)/i;
+      var m=text.match(pattern);return {rate:m?Number(m[1]||m[2]||m[3]):null,rest:m?text.replace(pattern,'').trim():text};
     }
     function voiceIsBlankItem_(item){return !item.item && !item.service && !Number(item.weight) && (!Number(item.qty)||Number(item.qty)===1);}
 
@@ -1669,7 +1669,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
     window.onAndroidVoicePartial = function(text){ applyVoiceTokenSpeech_(String(text||''),false); };
     document.addEventListener('visibilitychange',function(){if(document.hidden&&tokenVoiceActive_)stopVoiceToken();});
     window.onAndroidVoiceResult = function(text, mode){
-      if(mode==='guided'){if(typeof guidedVoice_!=='undefined')guidedVoice_.receive(text);return;}
+      if(/^guided/.test(mode)){if(typeof guidedVoice_!=='undefined')guidedVoice_.receive(text);return;}
       text=String(text||'').trim();
       if(mode==='confirmation'){handleVoiceTokenConfirmation_(text);return;}
       applyVoiceTokenSpeech_(text,true);
@@ -2683,7 +2683,7 @@ var guidedVoice_ = {
   listen:function(){
     if(!this.active||document.hidden)return;
     var self=this,epoch=this.epoch;this.listening=true;
-    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.startRecognition('guided');return;}
+    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.startRecognition(this.state==='confirm_entry'&&window.AndroidVoice.fastGuided?'guided-fast':'guided');return;}
     if(window.AndroidVoice)return;
     var Recognition=voiceRecognitionClass_();
     if(!Recognition){this.el('guidedTranscript').textContent='Microphone उपलब्ध नहीं है। नीचे जवाब लिखें।';return;}
