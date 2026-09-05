@@ -282,6 +282,14 @@
     #voiceItemsBtn { background:#087f5b !important; }
     .voice-token-panel h3 { margin:0 0 8px; font-size:15px; }
     #voiceTokenStopBtn { background:#666 !important; }
+    #voiceTokenStopBtn, #voiceItemsStopBtn { display:none !important; }
+    #tokenBackendStatus:empty, #voiceTokenStatus:empty, #voiceItemsStatus:empty { display:none !important; }
+    .simple-token-actions { display:flex; gap:6px; align-items:center; margin:4px 0 8px; }
+    .simple-token-actions .btn { flex:0 0 auto; margin:0; }
+    .simple-token-voice { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0 4px; }
+    .simple-token-voice .btn { width:100%; margin:0; min-height:46px; }
+    .simple-stop { width:100%; margin:0 0 6px !important; background:#666 !important; }
+    #guidedVoicePanel > summary { cursor:pointer; color:#555; }
     #voiceTokenTranscript { width:100%; min-height:54px; margin-top:8px; padding:7px; white-space:pre-wrap; overflow-wrap:anywhere; background:#fff; border:1px solid #ddd; border-radius:5px; }
     #tokenItemsTable { width:100% !important; padding:0 !important; margin:0 0 10px !important; background:transparent !important; overflow-x:hidden !important; }
     #tokenItemsTable table { width:100% !important; table-layout:fixed !important; border-collapse:collapse !important; }
@@ -592,43 +600,44 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>वॉइस टोकन <small style="font-size:11px">v2.7 Fast Confirm / Rate</small></h2>
+    <h2>टोकन <small style="font-size:11px">v2.8 सरल</small></h2>
     <details class="voice-token-panel" id="guidedVoicePanel" style="padding:6px;margin:4px 0">
-      <summary>सवाल-जवाब / Voice confirmation</summary>
-      <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें / फिर शुरू करें</button>
-      <button class="btn" type="button" onclick="guidedVoice_.stop(true)">Stop / Review manually</button>
-      <label style="display:block;margin:8px 0"><input id="guidedAutoStart" type="checkbox" onchange="guidedVoice_.setAuto(this)" style="width:auto"> मेरी अनुमति से Token खोलते ही सवाल पूछें</label>
+      <summary>वैकल्पिक सवाल-जवाब</summary>
+      <button class="btn" type="button" onclick="guidedVoice_.start()">🎤 शुरू करें</button>
+      <button class="btn" type="button" onclick="guidedVoice_.stop(true)">रोकें</button>
+      <label style="display:block;margin:8px 0"><input id="guidedAutoStart" type="checkbox" onchange="guidedVoice_.setAuto(this)" style="width:auto"> टोकन खुलते ही सवाल पूछें</label>
       <div id="guidedQuestion" role="status" aria-live="polite">शुरू करें दबाएँ। पहले फोन नंबर पूछा जाएगा।</div>
       <div id="guidedTranscript" style="overflow-wrap:anywhere;margin:8px 0"></div>
-      <input id="guidedAnswer" type="text" placeholder="आवाज़ न चले तो जवाब यहाँ लिखें" onkeydown="if(event.key==='Enter')guidedVoice_.submitTyped()">
-      <button class="btn" type="button" onclick="guidedVoice_.submitTyped()">जवाब भेजें</button>
+      <input id="guidedAnswer" type="text" placeholder="जवाब लिखें" onkeydown="if(event.key==='Enter')guidedVoice_.submitTyped()">
+      <button class="btn" type="button" onclick="guidedVoice_.submitTyped()">भेजें</button>
     </details>
     <div id="tokenBackendStatus" class="info" role="status"></div>
-    <div class="form-row"><label>Token Number:</label><input id="tokenNumber" readonly></div>
-    <div style="display:flex;gap:6px;flex-wrap:nowrap;margin:4px 0"><button class="btn" id="newTokenBtn" type="button" onclick="refreshToken_()" style="margin:0">New Token</button><button class="btn" id="refreshTokenBtn" type="button" onclick="refreshToken_()" style="margin:0">Refresh</button></div>
-    <div class="form-row"><label>Token Date:</label><input type="date" id="tokenDate"></div>
-    <div class="form-row"><label>Phone:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
-    <div class="form-row"><label>Name:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
-    <div class="form-row"><label>Delivery Date:</label><input type="date" id="tokenDeliveryDate"></div>
-    <div id="compactVoiceToolbar" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin:6px 0">
-      <div id="customerVoicePanel" style="min-width:0">
-        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')" style="width:100%;margin:0;padding:8px 4px;white-space:normal">🎤 Customer Details</button>
+    <div class="form-row"><label>टोकन नंबर:</label><input id="tokenNumber" readonly></div>
+    <div class="simple-token-actions"><button class="btn" id="newTokenBtn" type="button" onclick="refreshToken_()">नया टोकन</button><button class="btn" id="refreshTokenBtn" type="button" onclick="refreshToken_()">रिफ्रेश</button></div>
+    <div class="form-row"><label>टोकन तारीख:</label><input type="date" id="tokenDate"></div>
+    <div class="form-row"><label>फोन:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
+    <div class="form-row"><label>नाम:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
+    <div class="form-row"><label>डिलीवरी तारीख:</label><input type="date" id="tokenDeliveryDate"></div>
+    <div id="compactVoiceToolbar" class="simple-token-voice">
+      <div id="customerVoicePanel">
+        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')">🎤 ग्राहक विवरण</button>
         <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
       </div>
-      <div id="itemsVoicePanel" style="min-width:0">
-        <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')" style="width:100%;margin:0;padding:8px 4px;white-space:normal">🎤 Items</button>
+      <div id="itemsVoicePanel">
+        <button class="btn" id="voiceItemsBtn" type="button" onclick="startVoiceToken('items')">🎤 आइटम</button>
         <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
       </div>
     </div>
+    <button class="btn simple-stop" type="button" onclick="stopVoiceToken()">■ वॉइस रोकें</button>
     <div style="font-size:12px;overflow-wrap:anywhere"><span id="voiceTokenStatus" class="info"></span> <span id="voiceItemsStatus" class="info"></span></div>
     <details style="margin:3px 0"><summary>सुनी हुई बात / Transcript</summary><div id="voiceTokenTranscript" style="overflow-wrap:anywhere"></div><div id="voiceItemsTranscript" style="overflow-wrap:anywhere"></div></details>
     <div id="tokenItemsTable" class="table-holder"></div>
-    <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">Add Item</button>
-    <div class="form-row"><label>Total Quantity:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
-    <div class="form-row"><label>Remark:</label><textarea id="tokenRemark" rows="3" placeholder="Enter token remark..."></textarea></div>
+    <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">आइटम जोड़ें</button>
+    <div class="form-row"><label>कुल मात्रा:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
+    <div class="form-row"><label>टिप्पणी:</label><textarea id="tokenRemark" rows="2" placeholder="टिप्पणी"></textarea></div>
 
-    <button class="btn" id="saveTokenBtn" onclick="saveTokenBooking()">Save Token</button>
-    <button class="btn" id="refreshTokensBtn" onclick="loadTokens()">Refresh Tokens</button>
+    <button class="btn" id="saveTokenBtn" onclick="saveTokenBooking()">टोकन सेव करें</button>
+    <button class="btn" id="refreshTokensBtn" onclick="loadTokens()">सूची रिफ्रेश करें</button>
     <div id="tokenError" class="error"></div>
     <div id="tokenTableArea">
       <h3 style="margin:16px 0 8px; font-size:15px;">Token Details</h3>
