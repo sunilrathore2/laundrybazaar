@@ -286,7 +286,7 @@
     #tokenBackendStatus:empty, #voiceTokenStatus:empty, #voiceItemsStatus:empty { display:none !important; }
     .simple-token-actions { display:flex; gap:6px; align-items:center; margin:4px 0 8px; }
     .simple-token-actions .btn { flex:0 0 auto; margin:0; }
-    .simple-token-voice { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0 4px; }
+    .simple-token-voice { display:grid; grid-template-columns:1fr; gap:6px; margin:6px 0 4px; }
     .simple-token-voice .btn { width:100%; margin:0; min-height:46px; }
     .simple-stop { width:100%; margin:0 0 6px !important; background:#666 !important; }
     #tokenSection { padding:8px 6px !important; box-shadow:none !important; border-radius:0 !important; }
@@ -298,6 +298,7 @@
     #guidedVoicePanel { padding:3px 5px !important; margin:0 0 5px !important; border:0 !important; background:#f7f7f7 !important; }
     #guidedVoicePanel > button, #guidedTranscript, #guidedAnswer, #guidedQuickAnswers,
     #tokenBackendStatus, #tokenVoiceTranscriptBox { display:none !important; }
+    #customerVoicePanel { display:none !important; }
     #guidedQuestion { margin:0 !important; color:#0066cc; }
     #tokenRemark { min-height:46px !important; }
     #tokenItemsTable { margin-bottom:5px !important; }
@@ -612,7 +613,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>टोकन <small style="font-size:11px">v3.1 कॉम्पैक्ट</small></h2>
+    <h2>टोकन <small style="font-size:11px">v3.2 रेट सुधार</small></h2>
     <div id="guidedVoicePanel">
       <input id="guidedAutoStart" type="checkbox" checked hidden>
       <div id="guidedQuestion" role="status" aria-live="polite">वॉइस तैयार है।</div>
@@ -2799,6 +2800,10 @@ var guidedVoice_ = {
     if(/^(stop|cancel|रुको|रुकिए|बंद करो|रद्द करो)$/i.test(text)){this.stop(true);return;}
     var state=this.state,rows=this.rows(),result;
     var rateReply=readVoiceRate_(text);
+    if(state==='rate'&&rateReply.rate===null){
+      var bareRate=voiceNumberText_(normalizeVoiceAliases_(text)).trim().match(/^(\d+(?:\.\d+)?)$/);
+      if(bareRate)rateReply={rate:Number(bareRate[1]),rest:''};
+    }
     var correction=voiceNumberText_(text).match(/^(?:line|row|लाइन|पंक्ति)\s+(\d+)\s+(?:correct|edit|change|सुधारो|सुधारें|बदलो|बदलें)$/i);
     if(correction){var index=Number(correction[1])-1;if(index>=0&&index<getTokenItems().length)this.correctItem(index);else this.ask(state,'यह लाइन नहीं मिली। सही लाइन नंबर बोलें।');return;}
     if(state==='confirm_entry'){
