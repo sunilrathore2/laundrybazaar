@@ -301,6 +301,10 @@
     #customerVoicePanel { margin:0 0 5px; }
     #customerVoicePanel #voiceTokenBtn { width:100%; margin:0; }
     #guidedQuestion { margin:0 !important; color:#0066cc; }
+    #tokenSection .btn { transition:transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+    #tokenSection .btn:active { transform:scale(.98); }
+    #tokenSection .recording { box-shadow:0 0 0 3px rgba(220,53,69,.2) !important; }
+    #guidedQuestion { border-left:3px solid #FFA500; padding:4px 6px !important; background:#fffaf0; }
     #tokenRemark { min-height:46px !important; }
     #tokenItemsTable { margin-bottom:5px !important; }
     #tokenTableArea h3 { margin:8px 0 4px !important; }
@@ -614,7 +618,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>टोकन <small style="font-size:11px">v3.5 तेज वॉइस</small></h2>
+    <h2>टोकन <small style="font-size:11px">v3.7 मात्रा पुष्टि</small></h2>
     <div id="guidedVoicePanel">
       <input id="guidedAutoStart" type="checkbox" checked hidden>
       <div id="guidedQuestion" role="status" aria-live="polite">वॉइस तैयार है।</div>
@@ -644,7 +648,7 @@
     <div id="tokenItemsTable" class="table-holder"></div>
     <button class="btn" id="tokenAddItemBtn" type="button" onclick="addTokenItemRow()">आइटम जोड़ें</button>
     <div class="form-row"><label>कुल मात्रा:</label><input type="text" id="tokenQuantity" readonly value="0"></div>
-    <div class="form-row"><label>टिप्पणी:</label><textarea id="tokenRemark" rows="2" placeholder="टिप्पणी"></textarea></div>
+    <input type="hidden" id="tokenRemark" value="">
 
     <button class="btn" id="saveTokenBtn" onclick="saveTokenBooking()">टोकन सेव करें</button>
     <button class="btn" id="refreshTokensBtn" onclick="loadTokens()">सूची रिफ्रेश करें</button>
@@ -1201,9 +1205,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?(?:iron(?:ing)?|press(?:ing)?)\b|\bwashiron\b/gi,'WI'],
         [/\b(?:dho\s*(?:ke|kar)|dhoke|dhokar)\s*(?:(?:phir|fir)\s*)?(?:press|pres|iron|istri|istree)(?:\s+(?:karna|karo|kar\s*do|kar\s*dena))?\b/gi,'WI'],
         [/(?:धो\s*(?:के|कर(?:के)?)|धुलाई\s*(?:करके|कर\s*के|के\s*बाद))\s*(?:फिर\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
-        [/(?:वॉश|वाश|वास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
+        [/(?:वॉश|वाश|वॉस|वास|भास|बास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
         // Standalone shortcuts come AFTER the complete washing combinations.
-        [/\bwash\b|वॉश|वाश/gi,'WI'],
+        [/\b(?:wash|was|wosh|woss|waas|vaas|bhaas|baas)\b|वॉश|वाश|वॉस|वास|भास|बास/gi,'WI'],
         [/\bfold\b|फोल्ड/gi,'WF'],
         [/\b(?:d\s*c|dry\s*clean(?:ing)?)\b|डी\s*सी|ड्राई\s*क्लीन(?:िंग)?/gi,'DC'],
         // Washing combinations above must take precedence over standalone ironing.
@@ -1743,8 +1747,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
             document.getElementById('deliveryDate').value = tok.deliveryDate || document.getElementById('orderDate').value;
             if(Array.isArray(tok.items) && tok.items.length) renderItemsTable(tok.items.map(function(it){ return {service:it.service,item:it.item,qty:it.qty,weight:it.weight,rate:it.rate==null?'':it.rate,amt:0}; }));
             var tokenContinuation = 'Token Number: ' + (tok.tokenNumber || '') +
-              ' | Total Quantity: ' + (tok.quantity || 0) +
-              ' | Remark: ' + (tok.remark || '—');
+              ' | Total Quantity: ' + (tok.quantity || 0);
             document.getElementById('customerInfo').textContent = tokenContinuation;
             document.getElementById('customerInfo').className = 'info';
             showTab('orderBooking');
@@ -1781,7 +1784,6 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
                 '<div class="token-card-row"><span class="token-card-label">Customer</span><span class="token-card-value">'+escapeHtml(String(r.customerName||''))+'</span></div>'+
                 '<div class="token-card-row"><span class="token-card-label">Phone</span><span class="token-card-value">'+escapeHtml(String(r.phone||''))+'</span></div>'+
                 '<div class="token-card-row"><span class="token-card-label">Quantity</span><span class="token-card-value">'+escapeHtml(String(r.quantity||''))+'</span></div>'+
-                '<div class="token-card-row"><span class="token-card-label">Remark</span><span class="token-card-value">'+escapeHtml(String(r.remark||'—'))+'</span></div>'+
                 '<div class="token-card-row"><span class="token-card-label">Order No.</span><span class="token-card-value success">'+escapeHtml(String(r.orderNumber))+'</span></div>'+
                 '</div>';
             } else {
@@ -1794,7 +1796,6 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
                 '<div class="token-card-row"><span class="token-card-label">Customer</span><span class="token-card-value">'+escapeHtml(String(r.customerName||''))+'</span></div>'+
                 '<div class="token-card-row"><span class="token-card-label">Phone</span><span class="token-card-value">'+escapeHtml(String(r.phone||''))+'</span></div>'+
                 '<div class="token-card-row"><span class="token-card-label">Quantity</span><span class="token-card-value">'+escapeHtml(String(r.quantity||''))+'</span></div>'+
-                '<div class="token-card-row"><span class="token-card-label">Remark</span><span class="token-card-value">'+escapeHtml(String(r.remark||'—'))+'</span></div>'+
                 '<div class="token-card-action">'+button+'</div>'+
                 '</div>';
             }
@@ -2664,6 +2665,7 @@ var guidedVoice_ = {
   },
   stop:function(show){
     this.active=false;this.epoch++;this.promptId='';this.cancelInput();
+    this.el('voiceTokenBtn').classList.remove('recording');this.el('voiceItemsBtn').classList.remove('recording');
     if(show)this.el('guidedQuestion').textContent='बातचीत रुकी। भरी हुई जानकारी सुरक्षित है। जाँचें या फिर शुरू करें।';
   },
   fail:function(message){this.stop(false);this.el('guidedQuestion').textContent=message+' फिर शुरू करें दबाएँ या manual form भरें।';},
@@ -2683,7 +2685,7 @@ var guidedVoice_ = {
     if(!currentUser||!getActiveSessionToken()){this.el('guidedQuestion').textContent='पहले backend से login पूरा करें।';return;}
     if(this.loadingToken||!this.value('tokenNumber')){this.el('guidedQuestion').textContent='पहले New दबाकर backend से Token Number लें।';return;}
     if(!tokenServicesReady_){this.el('guidedQuestion').textContent='पहले Reload services दबाएँ।';return;}
-    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';this.detailsOnly=!!detailsOnly;
+    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';this.itemIndex=0;this.detailsOnly=!!detailsOnly;
     this.lastAuto=this.value('tokenNumber');this.el('guidedTranscript').textContent='';
     this.ask('phone','आपका फोन नंबर क्या है? दस अंकों का नंबर बोलें।');
   },
@@ -2699,6 +2701,8 @@ var guidedVoice_ = {
     if(!this.active)return;
     this.el('guidedVoicePanel').open=true;
     this.cancelInput();this.state=state;this.epoch++;
+    this.el('voiceTokenBtn').classList.toggle('recording',/^(phone|lookup|name|date|confirm_entry)$/.test(state)&&this.itemIndex===0);
+    this.el('voiceItemsBtn').classList.toggle('recording',/^(item|service|weight|rate|row_confirm|more|review)$/.test(state));
     var id='g'+this.epoch,self=this;this.promptId=id;
     this.el('guidedQuestion').textContent=question;this.el('guidedAnswer').value='';
     var controls=this.el('guidedQuickAnswers');
@@ -2721,7 +2725,7 @@ var guidedVoice_ = {
   listen:function(){
     if(!this.active||document.hidden)return;
     var self=this,epoch=this.epoch;this.listening=true;
-    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.startRecognition(/^(confirm_entry|row_confirm)$/.test(this.state)&&window.AndroidVoice.fastGuided?'guided-fast':'guided');return;}
+    if(window.AndroidVoice&&window.AndroidVoice.speakPrompt){window.AndroidVoice.startRecognition(/^(confirm_entry|row_confirm|more|review)$/.test(this.state)&&window.AndroidVoice.fastGuided?'guided-fast':'guided');return;}
     if(window.AndroidVoice)return;
     var Recognition=voiceRecognitionClass_();
     if(!Recognition){this.el('guidedTranscript').textContent='Microphone उपलब्ध नहीं है। नीचे जवाब लिखें।';return;}
@@ -2746,8 +2750,8 @@ var guidedVoice_ = {
   yesNo:function(text){
     var s=voiceClean_(String(text).toLowerCase()).replace(/[.!?।]+$/g,'').trim();
     if(/^(?:haan|haa|han|ha|हाँ|हां|yes)(?:\s+(?:haan|haa|han|ha|हाँ|हां|yes))*$/.test(s))return true;
-    if(/^(?:hanji|haan ji|ha ji|हाँ जी|हां जी|जी हाँ जी|जी हां जी|yes please|yes ji|yeah|yep|yup|ok|okay|okk|okke|okkey|okey|ओके|ओकेय|ठीक|ठीक है|सही|सही है|बिल्कुल|bilkul|theek hai|thik hai|sahi hai)$/.test(s))return true;
-    if(/^(?:नहीं जी|नही जी|जी नहीं|जी नही|नहीं नहीं|no no|nope|no thanks|nah|na|nahi ji|nahin ji|गलत|गलत है|wrong)$/.test(s))return false;
+    if(/^(?:hanji|haan ji|ha ji|हाँ जी|हां जी|जी हाँ जी|जी हां जी|yes please|yes ji|yeah|yep|yup|ok|okay|okk|okke|okkey|okey|ओके|ओकेय|ठीक|ठीक है|ठीक कर दो|सही|सही है|बिल्कुल|बिल्कुल सही|कर दो|हाँ कर दो|हां कर दो|हाँ कर दो जी|हां कर दो जी|हा कर दो|yes do it|go ahead|confirm|confirmed|affirmative|positive|bilkul|bilkul sahi|theek hai|thik hai|sahi hai|haan kardo|haan kar do|haa kardo|ha kar do|kar do)$/.test(s))return true;
+    if(/^(?:नहीं जी|नही जी|जी नहीं|जी नही|नहीं नहीं|नहीं करो|नही करो|मत करो|रहने दो|नहीं चाहिए|नही चाहिए|no no|nope|no thanks|do not|don't|dont|cancel|reject|rejected|negative|incorrect|nah|na|nahi ji|nahin ji|nahi karo|mat karo|rehne do|गलत|गलत है|wrong)$/.test(s))return false;
     if(/^(?:हाँ|हां|जी हाँ|जी हां|हां सेव करो|हाँ सेव करो|हां सेव कर दो|हाँ सेव कर दो|सेव करो|yes|yes save|yes save it|haa|haan|han|ha|save|save token|जी)$/.test(s))return true;
     if(/^(?:नहीं|नही|ना|बस|नहीं और|no|no more|nahi|nahin|bas)$/.test(s))return false;
     return null;
@@ -2791,11 +2795,11 @@ var guidedVoice_ = {
       if(/^(KG|KG WF)$/.test(row.service)&&!(Number(row.weight)>0)){this.ask('weight',row.qty+' '+row.item+' का कुल वजन बोलें।');return;}
       if(row.rate===''||row.rate==null||!Number.isFinite(Number(row.rate))||Number(row.rate)<0){this.ask('rate',row.qty+' '+row.item+' का रेट बोलें।');return;}
       var summary=row.qty+' '+row.item+', सर्विस '+row.service+(/^(KG|KG WF)$/.test(row.service)?', वजन '+row.weight+' किलो':'')+', रेट '+row.rate+' रुपये';
-      this.ask('row_confirm',summary+'। क्या यह सही है?');return;
+      this.ask('row_confirm',summary+'। सही?');return;
     }
-    this.ask('more','और कपड़े जोड़ने हैं? हाँ या नहीं बोलें।');
+    this.ask('more','और आइटम जोड़ना है?');
   },
-  snapshot:function(){return JSON.stringify({phone:this.value('tokenPhone'),name:this.value('tokenCustomerName'),date:this.value('tokenDeliveryDate'),remark:this.value('tokenRemark'),items:this.rows()});},
+  snapshot:function(){return JSON.stringify({phone:this.value('tokenPhone'),name:this.value('tokenCustomerName'),date:this.value('tokenDeliveryDate'),items:this.rows()});},
   review:function(){
     var rows=this.rows();
     if(!/^\d{10}$/.test(this.value('tokenPhone'))){this.ask('phone','सही दस अंकों का फोन नंबर बोलें।');return;}
@@ -2805,8 +2809,10 @@ var guidedVoice_ = {
     var bad=rows.findIndex(function(r){return !r.locked||!r.item||!r.service||!Number.isInteger(Number(r.qty))||Number(r.qty)<=0||r.rate===''||r.rate==null||!Number.isFinite(Number(r.rate))||Number(r.rate)<0||(/^(KG|KG WF)$/.test(r.service)&&!(Number(r.weight)>0));});
     if(bad>=0){this.itemIndex=bad;this.nextItemField();return;}
     var readable=rows.map(function(r){return r.qty+' '+r.item+', '+r.service+(/^(KG|KG WF)$/.test(r.service)?', वजन '+r.weight+' किलो':'')+(r.rate!==''&&r.rate!=null?', रेट '+r.rate+' रुपये':'');}).join('। ');
+    var totalQuantity=rows.reduce(function(total,row){return total+Number(row.qty||0);},0);
+    this.el('tokenQuantity').value=totalQuantity;
     this.reviewSnapshot=this.snapshot();
-    this.ask('review','जाँच लें। नाम '+this.value('tokenCustomerName')+'। फोन '+this.value('tokenPhone').split('').join(' ')+'। डिलीवरी '+this.value('tokenDeliveryDate')+'। '+readable+'। रिमार्क '+(this.value('tokenRemark')||'नहीं')+'। टोकन सेव कर दूँ? हाँ या नहीं बोलें।');
+    this.ask('review','नाम '+this.value('tokenCustomerName')+'। फोन '+this.value('tokenPhone').split('').join(' ')+'। डिलीवरी '+this.value('tokenDeliveryDate')+'। '+readable+'। कुल मात्रा '+totalQuantity+'। सेव करूँ?');
   },
   receive:function(answer){
     if(!this.active||!this.listening)return;
@@ -2826,7 +2832,7 @@ var guidedVoice_ = {
       if(!pending){this.stop(true);return;}
       if(accepted===true){this.entryPending=null;this.state=pending.state;this.acceptEntryOnce=true;this.listening=true;this.receive(pending.text);}
       else if(accepted===false){this.entryPending=null;this.el('guidedTranscript').textContent='';this.ask(pending.state,'ठीक है, '+pending.label+' दोबारा बोलें।');}
-      else this.ask('confirm_entry','मैंने सुना '+pending.text+'। सही है? हाँ या नहीं बोलें, या बटन दबाएँ।');
+      else this.ask('confirm_entry',pending.text+'। सही?');
       return;
     }
     if(state==='row_confirm'){
@@ -2837,10 +2843,10 @@ var guidedVoice_ = {
       else this.ask('row_confirm','केवल हाँ, ओके या नहीं बोलें।');
       return;
     }
-    if(/^(phone|name|date|remark)$/.test(state)&&!this.acceptEntryOnce){
-      var labels={phone:'फोन नंबर',name:'नाम',date:'डिलीवरी तारीख',remark:'रिमार्क'};
+    if(/^(phone|name|date)$/.test(state)&&!this.acceptEntryOnce){
+      var labels={phone:'फोन नंबर',name:'नाम',date:'डिलीवरी तारीख'};
       if(!this.validEntry(state,text)){this.entryPending=null;this.el('guidedTranscript').textContent='';this.ask(state,labels[state]+' का सही जवाब दोबारा बोलें। नाम और आइटम हिन्दी में रखें।');return;}
-      this.entryPending={state:state,text:text,label:labels[state]};this.ask('confirm_entry',labels[state]+': '+text+'। सही है?');return;
+      this.entryPending={state:state,text:text,label:labels[state]};this.ask('confirm_entry',labels[state]+': '+text+'। सही?');return;
     }
     this.acceptEntryOnce=false;
     if(state==='rate'){
@@ -2860,7 +2866,7 @@ var guidedVoice_ = {
       google.script.run.withSuccessHandler(function(name){
         if(!self.active||self.epoch!==epoch||self.value('tokenPhone')!==phone.value)return;
         if(self.timer){clearTimeout(self.timer);self.timer=null;}
-        if(typeof name==='string'&&hindiFormText_(name)){self.entryPending={state:'name',text:name.trim(),label:'नाम'};self.ask('confirm_entry','इस नंबर पर नाम '+name.trim()+' मिला। सही है?');}
+        if(typeof name==='string'&&hindiFormText_(name)){self.entryPending={state:'name',text:name.trim(),label:'नाम'};self.ask('confirm_entry','नाम '+name.trim()+'। सही?');}
         else self.ask('name','इस नंबर का नाम नहीं मिला। आपका नाम क्या है?');
       }).withFailureHandler(function(e){if(self.active&&self.epoch===epoch)self.fail('Customer lookup नहीं हुआ: '+(e.message||e));}).getCustomerByPhone(phone.value,getActiveSessionToken());return;
     }
@@ -2873,7 +2879,7 @@ var guidedVoice_ = {
       var value=voiceDateToIso_(text);
       if(!value){this.ask('date','तारीख समझ नहीं आई। दोबारा बोलें।');return;}
       this.el('tokenDeliveryDate').value=value;
-      if(this.detailsOnly){this.stop(false);this.el('guidedQuestion').textContent='ग्राहक विवरण भर गया।';return;}
+      this.detailsOnly=false;
       this.afterDate();return;
     }
     if(state==='item'){
@@ -2908,8 +2914,8 @@ var guidedVoice_ = {
       var more=this.yesNo(text);if(/^(और|aur)$/i.test(text))more=true;
       if(/^(?:(?:yes|haa|haan|han|ha|हाँ|हां)\s+)?(?:jodna hai|jodna|jodo|aur jodna hai|add|add more|जोड़ना है|जोड़ना|जोड़ो|जोडना है|और जोड़ना है)[.!?।]?$/i.test(text))more=true;
       if(more===true){this.itemIndex=rows.length;this.ask('item','अगले कपड़े की मात्रा और नाम बोलें।');}
-      else if(more===false)this.ask('remark','कोई रिमार्क या खास निर्देश हैं? नहीं हों तो नहीं बोलें।');
-      else this.ask('more','और कपड़े जोड़ने हैं? हाँ या नहीं बोलें।');return;
+      else if(more===false)this.review();
+      else this.ask('more','और आइटम जोड़ना है?');return;
     }
     if(state==='remark'){this.el('tokenRemark').value=this.yesNo(text)===false?'':text;this.review();return;}
     if(state==='review'){
