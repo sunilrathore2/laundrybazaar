@@ -298,7 +298,8 @@
     #guidedVoicePanel { padding:3px 5px !important; margin:0 0 5px !important; border:0 !important; background:#f7f7f7 !important; }
     #guidedVoicePanel > button, #guidedTranscript, #guidedAnswer, #guidedQuickAnswers,
     #tokenBackendStatus, #tokenVoiceTranscriptBox { display:none !important; }
-    #customerVoicePanel { display:none !important; }
+    #customerVoicePanel { margin:0 0 5px; }
+    #customerVoicePanel #voiceTokenBtn { width:100%; margin:0; }
     #guidedQuestion { margin:0 !important; color:#0066cc; }
     #tokenRemark { min-height:46px !important; }
     #tokenItemsTable { margin-bottom:5px !important; }
@@ -613,7 +614,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>टोकन <small style="font-size:11px">v3.4 राशि गणना</small></h2>
+    <h2>टोकन <small style="font-size:11px">v3.5 तेज वॉइस</small></h2>
     <div id="guidedVoicePanel">
       <input id="guidedAutoStart" type="checkbox" checked hidden>
       <div id="guidedQuestion" role="status" aria-live="polite">वॉइस तैयार है।</div>
@@ -624,14 +625,14 @@
     <div class="form-row"><label>टोकन नंबर:</label><input id="tokenNumber" readonly></div>
     <div class="simple-token-actions"><button class="btn" id="newTokenBtn" type="button" onclick="refreshToken_()">नया टोकन</button><button class="btn" id="refreshTokenBtn" type="button" onclick="refreshToken_()">रिफ्रेश</button></div>
     <div class="form-row"><label>टोकन तारीख:</label><input type="date" id="tokenDate"></div>
+    <div id="customerVoicePanel">
+      <button class="btn" id="voiceTokenBtn" type="button" onclick="guidedVoice_.start(true)">🎤 ग्राहक विवरण</button>
+      <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled>Stop</button>
+    </div>
     <div class="form-row"><label>फोन:</label><input type="text" id="tokenPhone" maxlength="10" oninput="lookupTokenCustomer()"></div>
     <div class="form-row"><label>नाम:</label><input type="text" id="tokenCustomerName" oninput="capitalizeInput(this)"></div>
     <div class="form-row"><label>डिलीवरी तारीख:</label><input type="date" id="tokenDeliveryDate"></div>
     <div id="compactVoiceToolbar" class="simple-token-voice">
-      <div id="customerVoicePanel">
-        <button class="btn" id="voiceTokenBtn" type="button" onclick="startVoiceToken('details')">🎤 ग्राहक विवरण</button>
-        <button class="btn" id="voiceTokenStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
-      </div>
       <div id="itemsVoicePanel">
         <button class="btn" id="voiceItemsBtn" type="button" onclick="guidedVoice_.startItems()">🎤 आइटम</button>
         <button class="btn" id="voiceItemsStopBtn" type="button" onclick="stopVoiceToken()" disabled style="padding:4px 8px;margin:2px 0">Stop</button>
@@ -2651,7 +2652,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 // Guided Token: each final answer is handled once; no network AI service is used.
 var guidedVoice_ = {
   active:false, state:'', epoch:0, promptId:'', listening:false, recognition:null,
-  timer:null, phoneBuffer:'', itemIndex:0, lastAuto:'', loadingToken:false, suppressAutoOnce:false,
+  timer:null, phoneBuffer:'', itemIndex:0, lastAuto:'', loadingToken:false, suppressAutoOnce:false, detailsOnly:false,
   el:function(id){return document.getElementById(id);},
   value:function(id){return this.el(id).value.trim();},
   cancelInput:function(){
@@ -2678,11 +2679,11 @@ var guidedVoice_ = {
     if(!window.AndroidVoice||!window.AndroidVoice.speakPrompt){this.el('guidedQuestion').textContent='सवाल-जवाब के लिए शुरू करें दबाएँ। Auto-start के लिए updated Android app चाहिए।';return;}
     this.start();
   },
-  start:function(){
+  start:function(detailsOnly){
     if(!currentUser||!getActiveSessionToken()){this.el('guidedQuestion').textContent='पहले backend से login पूरा करें।';return;}
     if(this.loadingToken||!this.value('tokenNumber')){this.el('guidedQuestion').textContent='पहले New दबाकर backend से Token Number लें।';return;}
     if(!tokenServicesReady_){this.el('guidedQuestion').textContent='पहले Reload services दबाएँ।';return;}
-    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';
+    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';this.detailsOnly=!!detailsOnly;
     this.lastAuto=this.value('tokenNumber');this.el('guidedTranscript').textContent='';
     this.ask('phone','आपका फोन नंबर क्या है? दस अंकों का नंबर बोलें।');
   },
@@ -2690,7 +2691,7 @@ var guidedVoice_ = {
     if(!currentUser||!getActiveSessionToken()){this.el('tokenError').textContent='पहले लॉगिन करें।';return;}
     if(this.loadingToken||!this.value('tokenNumber')){this.el('guidedQuestion').textContent='पहले नया टोकन लें।';return;}
     if(!tokenServicesReady_){this.el('guidedQuestion').textContent='सर्विस सूची लोड होने दें।';return;}
-    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';this.entryPending=null;this.acceptEntryOnce=false;
+    stopVoiceToken();this.stop(false);this.active=true;this.phoneBuffer='';this.detailsOnly=false;this.entryPending=null;this.acceptEntryOnce=false;
     var rows=this.rows(),first=rows.findIndex(function(row){return !row.locked;});this.itemIndex=first<0?rows.length:first;
     this.ask('item','मात्रा और आइटम का नाम बोलें।');
   },
@@ -2871,7 +2872,9 @@ var guidedVoice_ = {
     if(state==='date'){
       var value=voiceDateToIso_(text);
       if(!value){this.ask('date','तारीख समझ नहीं आई। दोबारा बोलें।');return;}
-      this.el('tokenDeliveryDate').value=value;this.afterDate();return;
+      this.el('tokenDeliveryDate').value=value;
+      if(this.detailsOnly){this.stop(false);this.el('guidedQuestion').textContent='ग्राहक विवरण भर गया।';return;}
+      this.afterDate();return;
     }
     if(state==='item'){
       result=voiceReadItems_(text);var incoming=result.items.filter(function(r){return !voiceIsBlankItem_(r);});
