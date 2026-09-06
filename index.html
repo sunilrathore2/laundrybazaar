@@ -1008,6 +1008,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
           clearBookingRequest_('token');
           document.getElementById('tokenError').textContent = 'Token Saved: '+n+' | Status: Pending';
           if(typeof guidedVoice_!=='undefined')guidedVoice_.el('guidedQuestion').textContent='Token '+n+' save हो गया। नया customer हो तो शुरू करें दबाएँ।';
+          if(window.AndroidVoice&&typeof window.AndroidVoice.speakMessage==='function')window.AndroidVoice.speakMessage('टोकन सफलतापूर्वक सेव हो गया है।');
           document.getElementById('tokenError').className = 'success';
           loadTokens();
           newToken();
@@ -1247,6 +1248,39 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         var o = String(opt).trim().toUpperCase();
         return o === code || (code === 'WI' && /WASH.*IRON/.test(o)) || (code === 'WF' && /WASH.*FOLD/.test(o)) || (code === 'DC' && /DRY.*CLEAN/.test(o)) || (code === 'IR' && /^(IRON(?:ING)?|PRESS(?:ING)?)$/.test(o));
       }) || '';
+    }
+
+    // Use every Android speech alternative, then apply a guarded fuzzy match.
+    function voiceEditDistance_(a,b){
+      a=String(a||'');b=String(b||'');var prev=[],cur=[],i,j;
+      for(j=0;j<=b.length;j++)prev[j]=j;
+      for(i=1;i<=a.length;i++){cur=[i];for(j=1;j<=b.length;j++)cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+(a.charAt(i-1)===b.charAt(j-1)?0:1));prev=cur;}
+      return prev[b.length];
+    }
+    function fuzzyServiceText_(value){
+      return voiceClean_(String(value||'')).toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g,' ').replace(/\b(?:service|karna|karni|karo|kar|do|hai|hain|please|ka|ki|ke|mein|me)\b|(?:सर्विस|करना|करनी|करो|कर|दो|है|हैं|का|की|के|में)/g,' ').replace(/(.)\1+/g,'$1').replace(/\s+/g,' ').trim();
+    }
+    function resolveVoiceServiceAlternatives_(alternatives,isKg){
+      var list=Array.isArray(alternatives)?alternatives.slice(0,5):[];
+      if(!list.length)list=[String(alternatives||'')];
+      for(var i=0;i<list.length;i++){var exact=resolveVoiceService_(list[i],isKg);if(exact)return exact;}
+      var phrases={
+        'KG WF':['kg wf','wf kg','kg fold','kg wash fold','kg wash and fold','kilo wash fold','kilo wash and fold','केजी फोल्ड','किलो वॉश फोल्ड'],
+        'DC':['dc','dry clean','dry cleaning','dri clean','dry cleen','drai klin','ड्राई क्लीन','डी सी'],
+        'IR':['ir','iron','iorn','ayron','ironing','press','pres','only press','khali press','खाली प्रेस','सिर्फ प्रेस','आयरन','इस्त्री'],
+        'WI':['wi','wash','waash','wosh','vosh','bosh','bhosh','bos','boss','waas','vaas','vas','wash iron','wash and iron','dho ke press','dhoke press','धो के प्रेस','धुलाई करके प्रेस','वॉश आयरन'],
+        'SH':['sh','shoe','shoo','shoes','shoe cleaning','joota','joote','जूता','जूते'],
+        'KG':['kg','kgs','kilo','kilogram','केजी','के जी','किलो']
+      };
+      var scores={};
+      list.forEach(function(raw){var heard=fuzzyServiceText_(raw);if(!heard)return;Object.keys(phrases).forEach(function(code){
+        if(!serviceOptions.some(function(opt){return String(opt).trim().toUpperCase()===code;}))return;
+        phrases[code].forEach(function(p){var target=fuzzyServiceText_(p),size=Math.max(heard.length,target.length);if(!size)return;var score=1-voiceEditDistance_(heard,target)/size;
+          scores[code]=Math.max(scores[code]||0,score);
+        });
+      });});
+      var ranked=Object.keys(scores).sort(function(a,b){return scores[b]-scores[a];}),best=ranked[0]||'',bestScore=best?scores[best]:0,second=ranked[1]?scores[ranked[1]]:0;
+      return bestScore>=0.62&&bestScore-second>=0.08?best:'';
     }
 
     function normalizeVoiceItem_(spoken){
@@ -1703,8 +1737,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
 
     window.onAndroidVoicePartial = function(text){ applyVoiceTokenSpeech_(String(text||''),false); };
     document.addEventListener('visibilitychange',function(){if(document.hidden&&tokenVoiceActive_)stopVoiceToken();});
-    window.onAndroidVoiceResult = function(text, mode){
-      if(/^guided/.test(mode)){if(typeof guidedVoice_!=='undefined')guidedVoice_.receive(text);return;}
+    window.onAndroidVoiceResult = function(text, mode, alternatives){
+      if(/^guided/.test(mode)){if(typeof guidedVoice_!=='undefined'){if(guidedVoice_.state==='service'){var service=resolveVoiceServiceAlternatives_(alternatives&&alternatives.length?alternatives:[text],false);if(service)text=service;}guidedVoice_.receive(text);}return;}
       text=String(text||'').trim();
       if(mode==='confirmation'){handleVoiceTokenConfirmation_(text);return;}
       applyVoiceTokenSpeech_(text,true);
