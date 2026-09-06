@@ -618,7 +618,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>टोकन <small style="font-size:11px">v3.7 मात्रा पुष्टि</small></h2>
+    <h2>टोकन <small style="font-size:11px">v3.8 WI पहचान</small></h2>
     <div id="guidedVoicePanel">
       <input id="guidedAutoStart" type="checkbox" checked hidden>
       <div id="guidedQuestion" role="status" aria-live="polite">वॉइस तैयार है।</div>
@@ -1202,12 +1202,12 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyxShdKdI86YQoRsjIb
         [/\b(?:narso|narson|nurso)\b|नरसों|नरसो/gi,'narso'],
         [/\b(?:parso|parson|barso|farso)\b|परसों|परसो/gi,'parso'],
         // Map spoken washing + ironing instructions to the WI service code.
-        [/\b(?:wash|was|wosh)\s*(?:(?:and|n|&)\s*)?(?:iron(?:ing)?|press(?:ing)?)\b|\bwashiron\b/gi,'WI'],
+        [/\b(?:wash|waash|was|waas|wosh|woss|vosh|bosh|bhosh|bos|boss|vaas|vas)\s*(?:(?:and|n|&)\s*)?(?:iron(?:ing)?|press(?:ing)?|pres)\b|\bwashiron\b/gi,'WI'],
         [/\b(?:dho\s*(?:ke|kar)|dhoke|dhokar)\s*(?:(?:phir|fir)\s*)?(?:press|pres|iron|istri|istree)(?:\s+(?:karna|karo|kar\s*do|kar\s*dena))?\b/gi,'WI'],
         [/(?:धो\s*(?:के|कर(?:के)?)|धुलाई\s*(?:करके|कर\s*के|के\s*बाद))\s*(?:फिर\s*)?(?:प्रेस|प्रैस|आयरन|इस्त्री|इस्तरी)\s*(?:करना|करो|कर\s*दो|कर\s*देना)?/g,'WI'],
         [/(?:वॉश|वाश|वॉस|वास|भास|बास)\s*(?:(?:एंड|और|एण्ड|&)\s*)?(?:आयरन|प्रेस|प्रैस|इस्त्री)/g,'WI'],
         // Standalone shortcuts come AFTER the complete washing combinations.
-        [/\b(?:wash|was|wosh|woss|waas|vaas|bhaas|baas)\b|वॉश|वाश|वॉस|वास|भास|बास/gi,'WI'],
+        [/\b(?:wash|waash|was|waas|wosh|woss|vosh|bosh|bhosh|bos|boss|vaas|vas|bhaas|baas)\b|वॉश|वाश|वॉस|वोश|बॉश|भोश|बोस|बॉस|भोस|वास|भास|बास/gi,'WI'],
         [/\bfold\b|फोल्ड/gi,'WF'],
         [/\b(?:d\s*c|dry\s*clean(?:ing)?)\b|डी\s*सी|ड्राई\s*क्लीन(?:िंग)?/gi,'DC'],
         // Washing combinations above must take precedence over standalone ironing.
