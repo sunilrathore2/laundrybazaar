@@ -680,42 +680,42 @@
   </div>
 
   <script>
-// This page runs directly on GitHub Pages; only data requests go to Apps Script.
+// GitHub stays in the address bar. Backend calls travel through an invisible
+// Apps Script iframe, which uses native google.script.run (no cross-origin fetch).
 window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZlMCxhh7IPp5hwjScP5OHVxkXlnM_JKDBQ2cdhRHMh5He28wZWAw/exec';
 (function(){
-  // Preserve the native bridge if this HTML is served by Apps Script itself.
   if(window.google && window.google.script && window.google.script.run)return;
-  function runner(success, failure, userObject){
-    return new Proxy({}, {get:function(_, name){
-      if(name === 'withSuccessHandler') return function(fn){return runner(fn,failure,userObject);};
-      if(name === 'withFailureHandler') return function(fn){return runner(success,fn,userObject);};
-      if(name === 'withUserObject') return function(value){return runner(success,failure,value);};
-      if(name === 'then') return undefined;
+  var bridgeReady=false, seq=0, pending={}, queue=[];
+  var iframe=document.createElement('iframe');
+  iframe.id='lbBackendBridge'; iframe.title=''; iframe.setAttribute('aria-hidden','true');
+  iframe.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
+  iframe.src=window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbBridge=1';
+  function send(msg){ if(bridgeReady&&iframe.contentWindow) iframe.contentWindow.postMessage(msg,'*'); else queue.push(msg); }
+  window.addEventListener('message',function(ev){
+    if(ev.source!==iframe.contentWindow)return; var d=ev.data||{};
+    if(d.type==='LB_RPC_READY'){ bridgeReady=true; var q=queue.splice(0); q.forEach(send); return; }
+    if(d.type!=='LB_RPC_RESULT'||!d.id||!pending[d.id])return;
+    var p=pending[d.id]; delete pending[d.id]; clearTimeout(p.timer);
+    if(d.ok){ if(p.success)p.success(d.result,p.userObject); }
+    else { var err=new Error(d.error||'Backend request failed.'); if(p.failure)p.failure(err,p.userObject); else alert(err.message); }
+  });
+  function runner(success,failure,userObject){
+    return new Proxy({},{get:function(_,name){
+      if(name==='withSuccessHandler')return function(fn){return runner(fn,failure,userObject);};
+      if(name==='withFailureHandler')return function(fn){return runner(success,fn,userObject);};
+      if(name==='withUserObject')return function(v){return runner(success,failure,v);};
+      if(name==='then')return undefined;
       return function(){
-        var args=Array.prototype.slice.call(arguments);
-        var stage='network';
-        fetch(window.LB_API_URL, {
-          method:'POST', redirect:'follow', credentials:'omit',
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body:JSON.stringify({api:'laundry-bazaar-v1',method:name,args:args})
-        }).then(async function(response){
-          stage='response';
-          if(!response.ok) throw new Error('API HTTP '+response.status+'. Check the Apps Script deployment.');
-          var text=await response.text(), data;
-          try{data=JSON.parse(text);}catch(_){throw new Error('Backend is not ready. Add GitHubAPI.gs and deploy a New version of the same web app with anonymous web access.');}
-          if(!data || typeof data.ok !== 'boolean') throw new Error('Unexpected backend response.');
-          if(!data.ok) throw new Error(data.error || 'Request failed.');
-          stage='callback';
-          if(success) success(data.result,userObject);
-        }).catch(function(error){
-          if(stage==='network') error=new Error('Network/access failure calling '+String(name)+'. Check backend connection. No automatic retry was made.');
-          else if(stage==='callback') error=new Error('Backend replied successfully, but the page failed to display '+String(name)+': '+error.message+'. If saving, check records before retrying.');
-          if(failure) failure(error,userObject);else alert(error.message);
-        });
+        var id='r'+Date.now()+'_'+(++seq), args=Array.prototype.slice.call(arguments);
+        var timer=setTimeout(function(){ var p=pending[id]; if(!p)return; delete pending[id]; var err=new Error('Backend connection timeout calling '+String(name)+'. Use Retry saved login / connection.'); if(p.failure)p.failure(err,p.userObject); else alert(err.message); },30000);
+        pending[id]={success:success,failure:failure,userObject:userObject,timer:timer};
+        send({type:'LB_RPC',id:id,method:String(name),args:args});
       };
     }});
   }
   window.google={script:{run:runner(null,null,null)}};
+  function mount(){ if(!iframe.parentNode)document.body.appendChild(iframe); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();
 </script>
 
