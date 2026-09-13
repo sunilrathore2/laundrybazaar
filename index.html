@@ -456,7 +456,7 @@
 <body>
   <div id="loginOverlay" class="login-overlay">
     <div class="login-box">
-      <h2>Laundry Bazaar Login</h2>
+      <h2>Laundry Bazaar Login <span style="font-size:12px;color:#b00020;font-weight:bold">LOGIN FIX v19</span> <small style="font-size:10px!important">v17</small></h2>
       <div class="login-field"><label>Username</label><input id="loginUsername" autocomplete="username"></div>
       <div class="login-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()"></div>
       <button class="btn" style="width:100%;" onclick="doLogin()">Login</button>
@@ -680,60 +680,45 @@
   </div>
 
   <script>
-// GitHub stays in the address bar. Backend calls travel through an invisible
-// Apps Script iframe using native google.script.run.
+// GitHub remains in the address bar. Backend RPC uses a normal HTML FORM POST
+// to Apps Script and receives the result by postMessage. This avoids the old
+// embedded google.script.run bridge, its READY handshake and its 60-second timeout.
 window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZlMCxhh7IPp5hwjScP5OHVxkXlnM_JKDBQ2cdhRHMh5He28wZWAw/exec';
 (function(){
   if(window.google && window.google.script && window.google.script.run)return;
-  var bridgeReady=false, seq=0, pending={}, queue=[], pingTimer=null, reloads=0;
-  var iframe=document.createElement('iframe');
-  iframe.id='lbBackendBridge'; iframe.title=''; iframe.setAttribute('aria-hidden','true');
-  iframe.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
-  function bridgeUrl(){return window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbBridge=1&v=12&t='+Date.now();}
-  iframe.src=bridgeUrl();
-  function rawPost(msg){try{if(iframe.contentWindow)iframe.contentWindow.postMessage(msg,'*');}catch(e){}}
-  function flush(){if(!bridgeReady)return;var q=queue.splice(0);q.forEach(function(m){rawPost(m);});}
-  function send(msg){if(bridgeReady)rawPost(msg);else queue.push(msg);}
-  function startPing(){
-    if(pingTimer)clearInterval(pingTimer);
-    pingTimer=setInterval(function(){if(!bridgeReady)rawPost({type:'LB_RPC_PING'});},1000);
-    rawPost({type:'LB_RPC_PING'});
+  var seq=0, pending={};
+  function rpc(method,args,success,failure,userObject){
+    var id='r'+Date.now()+'_'+(++seq);
+    var frame=document.createElement('iframe');
+    frame.name='lbRpcFrame_'+id; frame.id=frame.name;
+    frame.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
+    var form=document.createElement('form');
+    form.method='POST'; form.action=window.LB_API_URL; form.target=frame.name;
+    form.style.display='none';
+    function field(n,v){var x=document.createElement('input');x.type='hidden';x.name=n;x.value=v;form.appendChild(x);}
+    field('lbRpc','1'); field('id',id); field('method',String(method)); field('args',JSON.stringify(args||[]));
+    pending[id]={success:success,failure:failure,userObject:userObject,frame:frame,form:form};
+    document.body.appendChild(frame); document.body.appendChild(form); form.submit();
   }
   window.addEventListener('message',function(ev){
-    if(ev.source!==iframe.contentWindow)return;var d=ev.data||{};
-    if(d.type==='LB_RPC_READY'){
-      bridgeReady=true;if(pingTimer){clearInterval(pingTimer);pingTimer=null;}flush();
-      window.dispatchEvent(new CustomEvent('lb-backend-ready'));return;
-    }
-    if(d.type!=='LB_RPC_RESULT'||!d.id||!pending[d.id])return;
-    var p=pending[d.id];delete pending[d.id];clearTimeout(p.timer);
+    var d=ev.data||{}; if(d.type!=='LB_FORM_RPC_RESULT'||!d.id||!pending[d.id])return;
+    var p=pending[d.id]; delete pending[d.id];
+    try{if(p.form&&p.form.parentNode)p.form.parentNode.removeChild(p.form);if(p.frame&&p.frame.parentNode)p.frame.parentNode.removeChild(p.frame);}catch(e){}
     if(d.ok){if(p.success)p.success(d.result,p.userObject);}
-    else{var err=new Error(d.error||'Backend request failed.');if(p.failure)p.failure(err,p.userObject);else alert(err.message);}
+    else {var err=new Error(d.error||'Backend request failed.');if(p.failure)p.failure(err,p.userObject);else alert(err.message);}
   });
-  iframe.addEventListener('load',function(){startPing();});
   function runner(success,failure,userObject){
     return new Proxy({},{get:function(_,name){
       if(name==='withSuccessHandler')return function(fn){return runner(fn,failure,userObject);};
       if(name==='withFailureHandler')return function(fn){return runner(success,fn,userObject);};
       if(name==='withUserObject')return function(v){return runner(success,failure,v);};
       if(name==='then')return undefined;
-      return function(){
-        var id='r'+Date.now()+'_'+(++seq),args=Array.prototype.slice.call(arguments);
-        var timer=setTimeout(function(){
-          var p=pending[id];if(!p)return;delete pending[id];
-          var err=new Error('Backend connection timeout calling '+String(name)+'.');
-          if(p.failure)p.failure(err,p.userObject);else alert(err.message);
-        },60000);
-        pending[id]={success:success,failure:failure,userObject:userObject,timer:timer};
-        send({type:'LB_RPC',id:id,method:String(name),args:args});
-      };
+      return function(){rpc(String(name),Array.prototype.slice.call(arguments),success,failure,userObject);};
     }});
   }
   window.google={script:{run:runner(null,null,null)}};
-  window.lbBackendIsReady=function(){return bridgeReady;};
-  window.lbReloadBackendBridge=function(){bridgeReady=false;reloads++;iframe.src=bridgeUrl();startPing();};
-  function mount(){if(!iframe.parentNode)document.body.appendChild(iframe);startPing();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+  window.lbBackendIsReady=function(){return true;};
+  window.lbReloadBackendBridge=function(){return true;};
 })();
 </script>
 
@@ -812,40 +797,29 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
     let voiceTokenConfirmRecognition = null;
 
     window.onload = function() {
-      if (window.lbBackendIsReady && window.lbBackendIsReady()) restoreSavedSession_();
-      else {
-        document.getElementById('loginError').textContent='Connecting to backend…';
-        var started=false;
-        function go(){if(started)return;started=true;restoreSavedSession_();}
-        window.addEventListener('lb-backend-ready',go,{once:true});
-        setTimeout(function(){if(!started&&window.lbReloadBackendBridge)window.lbReloadBackendBridge();},8000);
-        setTimeout(go,20000);
+      // Persistent device login: do not block startup on a getSession network call.
+      // The signed backend token is still supplied to every protected operation.
+      var savedToken = localStorage.getItem('lbSession') || '';
+      var savedUser = localStorage.getItem('lbSessionUser') || '';
+      var savedRole = localStorage.getItem('lbSessionRole') || '';
+      if (savedToken && savedUser && savedRole) {
+        sessionToken = savedToken;
+        activateSession({token:savedToken, username:savedUser, role:savedRole});
+        return;
       }
+      document.getElementById('loginUsername').focus();
     };
     function restoreSavedSession_() {
       sessionToken=localStorage.getItem('lbSession')||'';
-      if (sessionToken) {
-        document.getElementById('loginError').textContent='Checking saved login with backend…';
-        google.script.run
-          .withSuccessHandler(function(res){
-            if (res && res.success) {
-              activateSession({token:sessionToken, username:res.username, role:res.role});
-            } else {
-              localStorage.removeItem('lbSession');
-              sessionToken='';
-              document.getElementById('loginError').textContent='Saved session is no longer valid. Please login.';
-              document.getElementById('loginUsername').focus();
-            }
-          })
-          .withFailureHandler(function(e){
-            // A network/deployment failure is not evidence that the session is invalid.
-            document.getElementById('loginError').textContent='Cannot verify saved login: '+String((e&&e.message)||e||'Backend connection failed').replace(/\.?\s*Use Retry saved login \/ connection\.?$/i,'')+'. Use Retry saved login / connection.';
-            document.getElementById('loginUsername').focus();
-          })
-          .getSession(sessionToken);
-      } else {
-        document.getElementById('loginUsername').focus();
-      }
+      if (!sessionToken) { document.getElementById('loginUsername').focus(); return; }
+      var savedUser=localStorage.getItem('lbSessionUser')||'';
+      var savedRole=localStorage.getItem('lbSessionRole')||'';
+      if(savedUser && savedRole){ activateSession({token:sessionToken,username:savedUser,role:savedRole}); return; }
+      document.getElementById('loginError').textContent='Checking saved login…';
+      lbJsonpRpc_('getSession',[sessionToken],function(res){
+        if(res&&res.success){activateSession({token:sessionToken,username:res.username,role:res.role});}
+        else{document.getElementById('loginError').textContent='Saved session is invalid. Please login.';}
+      },function(e){document.getElementById('loginError').textContent='Connection problem: '+((e&&e.message)||e);});
     }
 
     function getActiveSessionToken() {
@@ -859,6 +833,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       sessionToken = res.token || sessionToken;
       currentUser = {username:res.username, role:normalizedRole};
       localStorage.setItem('lbSession', sessionToken);
+      localStorage.setItem('lbSessionUser', String(res.username||''));
+      localStorage.setItem('lbSessionRole', normalizedRole);
       document.getElementById('loginOverlay').style.display='none';
       var userBar = document.getElementById('userBar');
       userBar.style.display='flex';
@@ -880,15 +856,29 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       if(normalizedRole==='delivery' || normalizedRole==='admin' || normalizedRole==='manager') { newToken(); loadTokens(); }
     }
 
+    // v19 login transport: JSONP does not use the iframe RPC bridge.
+    function lbJsonpRpc_(method,args,success,failure){
+      var cb='__lbj_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      var script=document.createElement('script');
+      var done=false;
+      function clean(){try{delete window[cb];}catch(e){window[cb]=undefined;}if(script.parentNode)script.parentNode.removeChild(script);}
+      window[cb]=function(res){if(done)return;done=true;clean();if(res&&res.ok){if(success)success(res.result);}else if(failure)failure(new Error((res&&res.error)||'Backend request failed.'));};
+      script.onerror=function(){if(done)return;done=true;clean();if(failure)failure(new Error('Backend connection failed. Check Apps Script deployment URL/access.'));};
+      script.src=window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbJsonp=1&callback='+encodeURIComponent(cb)+'&method='+encodeURIComponent(method)+'&args='+encodeURIComponent(JSON.stringify(args||[]))+'&_='+Date.now();
+      document.head.appendChild(script);
+    }
+
     function doLogin() {
       const u = document.getElementById('loginUsername').value.trim();
       const p = document.getElementById('loginPassword').value;
       sessionToken = '';
       document.getElementById('loginError').textContent = '';
-      google.script.run.withSuccessHandler(function(res){
+      document.getElementById('loginError').textContent = 'Connecting…';
+      lbJsonpRpc_('login',[u,p],function(res){
         if(!res || !res.success){ document.getElementById('loginError').textContent = (res&&res.message)||'Login failed'; return; }
+        document.getElementById('loginError').textContent = '';
         activateSession(res);
-      }).withFailureHandler(function(e){ document.getElementById('loginError').textContent = 'Login error: '+e; }).login(u,p);
+      },function(e){ document.getElementById('loginError').textContent = 'Login error: '+((e&&e.message)||e); });
     }
 
     function showLoginScreen(){
@@ -905,6 +895,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       stopVoiceToken();
       var t = getActiveSessionToken();
       localStorage.removeItem('lbSession');
+      localStorage.removeItem('lbSessionUser');
+      localStorage.removeItem('lbSessionRole');
       sessionToken = '';
       currentUser = null;
       showLoginScreen();
