@@ -681,24 +681,36 @@
 
   <script>
 // GitHub stays in the address bar. Backend calls travel through an invisible
-// Apps Script iframe, which uses native google.script.run (no cross-origin fetch).
+// Apps Script iframe using native google.script.run.
 window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZlMCxhh7IPp5hwjScP5OHVxkXlnM_JKDBQ2cdhRHMh5He28wZWAw/exec';
 (function(){
   if(window.google && window.google.script && window.google.script.run)return;
-  var bridgeReady=false, seq=0, pending={}, queue=[];
+  var bridgeReady=false, seq=0, pending={}, queue=[], pingTimer=null, reloads=0;
   var iframe=document.createElement('iframe');
   iframe.id='lbBackendBridge'; iframe.title=''; iframe.setAttribute('aria-hidden','true');
   iframe.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
-  iframe.src=window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbBridge=1';
-  function send(msg){ if(bridgeReady&&iframe.contentWindow) iframe.contentWindow.postMessage(msg,'*'); else queue.push(msg); }
+  function bridgeUrl(){return window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbBridge=1&v=12&t='+Date.now();}
+  iframe.src=bridgeUrl();
+  function rawPost(msg){try{if(iframe.contentWindow)iframe.contentWindow.postMessage(msg,'*');}catch(e){}}
+  function flush(){if(!bridgeReady)return;var q=queue.splice(0);q.forEach(function(m){rawPost(m);});}
+  function send(msg){if(bridgeReady)rawPost(msg);else queue.push(msg);}
+  function startPing(){
+    if(pingTimer)clearInterval(pingTimer);
+    pingTimer=setInterval(function(){if(!bridgeReady)rawPost({type:'LB_RPC_PING'});},1000);
+    rawPost({type:'LB_RPC_PING'});
+  }
   window.addEventListener('message',function(ev){
-    if(ev.source!==iframe.contentWindow)return; var d=ev.data||{};
-    if(d.type==='LB_RPC_READY'){ bridgeReady=true; var q=queue.splice(0); q.forEach(send); return; }
+    if(ev.source!==iframe.contentWindow)return;var d=ev.data||{};
+    if(d.type==='LB_RPC_READY'){
+      bridgeReady=true;if(pingTimer){clearInterval(pingTimer);pingTimer=null;}flush();
+      window.dispatchEvent(new CustomEvent('lb-backend-ready'));return;
+    }
     if(d.type!=='LB_RPC_RESULT'||!d.id||!pending[d.id])return;
-    var p=pending[d.id]; delete pending[d.id]; clearTimeout(p.timer);
-    if(d.ok){ if(p.success)p.success(d.result,p.userObject); }
-    else { var err=new Error(d.error||'Backend request failed.'); if(p.failure)p.failure(err,p.userObject); else alert(err.message); }
+    var p=pending[d.id];delete pending[d.id];clearTimeout(p.timer);
+    if(d.ok){if(p.success)p.success(d.result,p.userObject);}
+    else{var err=new Error(d.error||'Backend request failed.');if(p.failure)p.failure(err,p.userObject);else alert(err.message);}
   });
+  iframe.addEventListener('load',function(){startPing();});
   function runner(success,failure,userObject){
     return new Proxy({},{get:function(_,name){
       if(name==='withSuccessHandler')return function(fn){return runner(fn,failure,userObject);};
@@ -706,15 +718,21 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       if(name==='withUserObject')return function(v){return runner(success,failure,v);};
       if(name==='then')return undefined;
       return function(){
-        var id='r'+Date.now()+'_'+(++seq), args=Array.prototype.slice.call(arguments);
-        var timer=setTimeout(function(){ var p=pending[id]; if(!p)return; delete pending[id]; var err=new Error('Backend connection timeout calling '+String(name)+'. Use Retry saved login / connection.'); if(p.failure)p.failure(err,p.userObject); else alert(err.message); },30000);
+        var id='r'+Date.now()+'_'+(++seq),args=Array.prototype.slice.call(arguments);
+        var timer=setTimeout(function(){
+          var p=pending[id];if(!p)return;delete pending[id];
+          var err=new Error('Backend connection timeout calling '+String(name)+'.');
+          if(p.failure)p.failure(err,p.userObject);else alert(err.message);
+        },60000);
         pending[id]={success:success,failure:failure,userObject:userObject,timer:timer};
         send({type:'LB_RPC',id:id,method:String(name),args:args});
       };
     }});
   }
   window.google={script:{run:runner(null,null,null)}};
-  function mount(){ if(!iframe.parentNode)document.body.appendChild(iframe); }
+  window.lbBackendIsReady=function(){return bridgeReady;};
+  window.lbReloadBackendBridge=function(){bridgeReady=false;reloads++;iframe.src=bridgeUrl();startPing();};
+  function mount(){if(!iframe.parentNode)document.body.appendChild(iframe);startPing();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();
 </script>
@@ -793,7 +811,17 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
     let voiceTokenRecognition = null;
     let voiceTokenConfirmRecognition = null;
 
-    window.onload = function() {restoreSavedSession_();};
+    window.onload = function() {
+      if (window.lbBackendIsReady && window.lbBackendIsReady()) restoreSavedSession_();
+      else {
+        document.getElementById('loginError').textContent='Connecting to backend…';
+        var started=false;
+        function go(){if(started)return;started=true;restoreSavedSession_();}
+        window.addEventListener('lb-backend-ready',go,{once:true});
+        setTimeout(function(){if(!started&&window.lbReloadBackendBridge)window.lbReloadBackendBridge();},8000);
+        setTimeout(go,20000);
+      }
+    };
     function restoreSavedSession_() {
       sessionToken=localStorage.getItem('lbSession')||'';
       if (sessionToken) {
@@ -811,7 +839,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
           })
           .withFailureHandler(function(e){
             // A network/deployment failure is not evidence that the session is invalid.
-            document.getElementById('loginError').textContent='Cannot verify saved login: '+(e.message||e)+'. Use Retry saved login / connection.';
+            document.getElementById('loginError').textContent='Cannot verify saved login: '+String((e&&e.message)||e||'Backend connection failed').replace(/\.?\s*Use Retry saved login \/ connection\.?$/i,'')+'. Use Retry saved login / connection.';
             document.getElementById('loginUsername').focus();
           })
           .getSession(sessionToken);
