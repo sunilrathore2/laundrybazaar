@@ -680,60 +680,45 @@
   </div>
 
   <script>
-// GitHub stays in the address bar. Backend calls travel through an invisible
-// Apps Script iframe using native google.script.run.
+// GitHub remains in the address bar. Backend RPC uses a normal HTML FORM POST
+// to Apps Script and receives the result by postMessage. This avoids the old
+// embedded google.script.run bridge, its READY handshake and its 60-second timeout.
 window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZlMCxhh7IPp5hwjScP5OHVxkXlnM_JKDBQ2cdhRHMh5He28wZWAw/exec';
 (function(){
   if(window.google && window.google.script && window.google.script.run)return;
-  var bridgeReady=false, seq=0, pending={}, queue=[], pingTimer=null, reloads=0;
-  var iframe=document.createElement('iframe');
-  iframe.id='lbBackendBridge'; iframe.title=''; iframe.setAttribute('aria-hidden','true');
-  iframe.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
-  function bridgeUrl(){return window.LB_API_URL+(window.LB_API_URL.indexOf('?')>=0?'&':'?')+'lbBridge=1&v=12&t='+Date.now();}
-  iframe.src=bridgeUrl();
-  function rawPost(msg){try{if(iframe.contentWindow)iframe.contentWindow.postMessage(msg,'*');}catch(e){}}
-  function flush(){if(!bridgeReady)return;var q=queue.splice(0);q.forEach(function(m){rawPost(m);});}
-  function send(msg){if(bridgeReady)rawPost(msg);else queue.push(msg);}
-  function startPing(){
-    if(pingTimer)clearInterval(pingTimer);
-    pingTimer=setInterval(function(){if(!bridgeReady)rawPost({type:'LB_RPC_PING'});},1000);
-    rawPost({type:'LB_RPC_PING'});
+  var seq=0, pending={};
+  function rpc(method,args,success,failure,userObject){
+    var id='r'+Date.now()+'_'+(++seq);
+    var frame=document.createElement('iframe');
+    frame.name='lbRpcFrame_'+id; frame.id=frame.name;
+    frame.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;pointer-events:none';
+    var form=document.createElement('form');
+    form.method='POST'; form.action=window.LB_API_URL; form.target=frame.name;
+    form.style.display='none';
+    function field(n,v){var x=document.createElement('input');x.type='hidden';x.name=n;x.value=v;form.appendChild(x);}
+    field('lbRpc','1'); field('id',id); field('method',String(method)); field('args',JSON.stringify(args||[]));
+    pending[id]={success:success,failure:failure,userObject:userObject,frame:frame,form:form};
+    document.body.appendChild(frame); document.body.appendChild(form); form.submit();
   }
   window.addEventListener('message',function(ev){
-    if(ev.source!==iframe.contentWindow)return;var d=ev.data||{};
-    if(d.type==='LB_RPC_READY'){
-      bridgeReady=true;if(pingTimer){clearInterval(pingTimer);pingTimer=null;}flush();
-      window.dispatchEvent(new CustomEvent('lb-backend-ready'));return;
-    }
-    if(d.type!=='LB_RPC_RESULT'||!d.id||!pending[d.id])return;
-    var p=pending[d.id];delete pending[d.id];clearTimeout(p.timer);
+    var d=ev.data||{}; if(d.type!=='LB_FORM_RPC_RESULT'||!d.id||!pending[d.id])return;
+    var p=pending[d.id]; delete pending[d.id];
+    try{if(p.form&&p.form.parentNode)p.form.parentNode.removeChild(p.form);if(p.frame&&p.frame.parentNode)p.frame.parentNode.removeChild(p.frame);}catch(e){}
     if(d.ok){if(p.success)p.success(d.result,p.userObject);}
-    else{var err=new Error(d.error||'Backend request failed.');if(p.failure)p.failure(err,p.userObject);else alert(err.message);}
+    else {var err=new Error(d.error||'Backend request failed.');if(p.failure)p.failure(err,p.userObject);else alert(err.message);}
   });
-  iframe.addEventListener('load',function(){startPing();});
   function runner(success,failure,userObject){
     return new Proxy({},{get:function(_,name){
       if(name==='withSuccessHandler')return function(fn){return runner(fn,failure,userObject);};
       if(name==='withFailureHandler')return function(fn){return runner(success,fn,userObject);};
       if(name==='withUserObject')return function(v){return runner(success,failure,v);};
       if(name==='then')return undefined;
-      return function(){
-        var id='r'+Date.now()+'_'+(++seq),args=Array.prototype.slice.call(arguments);
-        var timer=setTimeout(function(){
-          var p=pending[id];if(!p)return;delete pending[id];
-          var err=new Error('Backend connection timeout calling '+String(name)+'.');
-          if(p.failure)p.failure(err,p.userObject);else alert(err.message);
-        },60000);
-        pending[id]={success:success,failure:failure,userObject:userObject,timer:timer};
-        send({type:'LB_RPC',id:id,method:String(name),args:args});
-      };
+      return function(){rpc(String(name),Array.prototype.slice.call(arguments),success,failure,userObject);};
     }});
   }
   window.google={script:{run:runner(null,null,null)}};
-  window.lbBackendIsReady=function(){return bridgeReady;};
-  window.lbReloadBackendBridge=function(){bridgeReady=false;reloads++;iframe.src=bridgeUrl();startPing();};
-  function mount(){if(!iframe.parentNode)document.body.appendChild(iframe);startPing();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+  window.lbBackendIsReady=function(){return true;};
+  window.lbReloadBackendBridge=function(){return true;};
 })();
 </script>
 
