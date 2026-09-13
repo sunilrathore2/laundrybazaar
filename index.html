@@ -812,15 +812,17 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
     let voiceTokenConfirmRecognition = null;
 
     window.onload = function() {
-      if (window.lbBackendIsReady && window.lbBackendIsReady()) restoreSavedSession_();
-      else {
-        document.getElementById('loginError').textContent='Connecting to backend…';
-        var started=false;
-        function go(){if(started)return;started=true;restoreSavedSession_();}
-        window.addEventListener('lb-backend-ready',go,{once:true});
-        setTimeout(function(){if(!started&&window.lbReloadBackendBridge)window.lbReloadBackendBridge();},8000);
-        setTimeout(go,20000);
+      // Persistent device login: do not block startup on a getSession network call.
+      // The signed backend token is still supplied to every protected operation.
+      var savedToken = localStorage.getItem('lbSession') || '';
+      var savedUser = localStorage.getItem('lbSessionUser') || '';
+      var savedRole = localStorage.getItem('lbSessionRole') || '';
+      if (savedToken && savedUser && savedRole) {
+        sessionToken = savedToken;
+        activateSession({token:savedToken, username:savedUser, role:savedRole});
+        return;
       }
+      document.getElementById('loginUsername').focus();
     };
     function restoreSavedSession_() {
       sessionToken=localStorage.getItem('lbSession')||'';
@@ -859,6 +861,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       sessionToken = res.token || sessionToken;
       currentUser = {username:res.username, role:normalizedRole};
       localStorage.setItem('lbSession', sessionToken);
+      localStorage.setItem('lbSessionUser', String(res.username||''));
+      localStorage.setItem('lbSessionRole', normalizedRole);
       document.getElementById('loginOverlay').style.display='none';
       var userBar = document.getElementById('userBar');
       userBar.style.display='flex';
@@ -905,6 +909,8 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       stopVoiceToken();
       var t = getActiveSessionToken();
       localStorage.removeItem('lbSession');
+      localStorage.removeItem('lbSessionUser');
+      localStorage.removeItem('lbSessionRole');
       sessionToken = '';
       currentUser = null;
       showLoginScreen();
