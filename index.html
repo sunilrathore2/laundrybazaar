@@ -977,7 +977,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       if(typeof guidedVoice_!=='undefined'){guidedVoice_.entryPending=null;guidedVoice_.acceptEntryOnce=false;}
       if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=true;
       document.getElementById('tokenError').textContent='Requesting token number from backend…';
-      google.script.run.withSuccessHandler(function(n){
+      lbJsonpRpc_('getNewTokenNumber',[getActiveSessionToken()],function(n){
         if(generation!==tokenLoadGeneration_)return;
         tokenVoicePending_=null;tokenVoiceDraft_=null;tokenVoiceActive_=false;
         document.getElementById('tokenNumber').value = n;
@@ -991,11 +991,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
         document.getElementById('saveTokenBtn').disabled = false;
         document.getElementById('tokenError').textContent = '';
         if(typeof guidedVoice_!=='undefined'){guidedVoice_.loadingToken=false;guidedVoice_.maybeAuto();}
-      }).withFailureHandler(function(e){
+      },function(e){
         if(generation!==tokenLoadGeneration_)return;
         if(typeof guidedVoice_!=='undefined')guidedVoice_.loadingToken=false;
-        document.getElementById('tokenError').textContent = 'Unable to get new token number: '+(e.message||e);
-      }).getNewTokenNumber(getActiveSessionToken());
+        document.getElementById('tokenError').textContent = 'Unable to get new token number: '+(e&&e.message?e.message:e);
+      });
     }
 
     function saveTokenBooking(){
@@ -2252,16 +2252,13 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
 
     function openAndroidPdf(orderNumber, type){
       var serverFunction = type==='Tag'?'saveTagPdfAndGetLink':'saveInvoicePdfAndGetLink';
-      google.script.run
-        .withSuccessHandler(function(url){
+      lbJsonpRpc_(serverFunction,[orderNumber, getActiveSessionToken()],function(url){
           if(!url || String(url).indexOf('Error')===0){
             alert('Unable to create '+type+' PDF: '+(url||'Unknown error'));
             return;
           }
           showAndroidAction(type+' Ready', 'Tap below to open the PDF in Android. Then use Print or Save as PDF.', url, 'Open '+type+' PDF');
-        })
-        .withFailureHandler(function(e){ alert('Unable to create '+type+' PDF: '+(e.message||e)); })
-        [serverFunction](orderNumber, getActiveSessionToken());
+        },function(e){ alert('Unable to create '+type+' PDF: '+(e&&e.message?e.message:e)); });
     }
 
     function printInvoice() {
@@ -2272,10 +2269,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       }
       if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Invoice'); return; }
       const win = prepareAndroidPrintWindow('Invoice');
-      google.script.run
-        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Invoice'); })
-        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e.message||e)); })
-        .generateInvoice(orderNumber, getActiveSessionToken());
+      lbJsonpRpc_('generateInvoice',[orderNumber, getActiveSessionToken()],function(html){
+          printHtmlOnAndroid(win, html, 'Invoice');
+        },function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e&&e.message?e.message:e)); });
     }
 
     function printTag() {
@@ -2372,10 +2368,9 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       if (!orderNumber) return alert("Enter order number.");
       if(isAndroidDevice()){ openAndroidPdf(orderNumber, 'Invoice'); return; }
       const win = prepareAndroidPrintWindow('Invoice');
-      google.script.run
-        .withSuccessHandler(function(html){ printHtmlOnAndroid(win, html, 'Invoice'); })
-        .withFailureHandler(function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e.message||e)); })
-        .generateInvoice(orderNumber, getActiveSessionToken());
+      lbJsonpRpc_('generateInvoice',[orderNumber, getActiveSessionToken()],function(html){
+          printHtmlOnAndroid(win, html, 'Invoice');
+        },function(e){ if(win) win.close(); alert('Unable to generate invoice: '+(e&&e.message?e.message:e)); });
     }
 
     function printTagFromTab() {
