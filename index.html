@@ -1996,7 +1996,7 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       document.getElementById('customerInfo').textContent = '';
       document.getElementById('phoneLoading').style.display = 'none';
       
-      google.script.run.withSuccessHandler(function(obj) {
+      lbJsonpRpc_('getNewOrderDetails',[activeToken],function(obj) {
         document.getElementById('orderNumber').value = obj.orderNumber;
         document.getElementById('orderDate').value = obj.today;
         document.getElementById('customerName').value = "";
@@ -2011,10 +2011,10 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
         document.getElementById('remoteTagBtn').style.display = "none";
         document.getElementById('whatsappInvoiceBtn').style.display = "none";
         if (typeof prefillCallback === 'function') prefillCallback();
-      }).withFailureHandler(function(e){
+      },function(e){
         document.getElementById('orderError').textContent = 'Unable to get new order number: '+(e.message||e);
         document.getElementById('orderError').className = 'error';
-      }).getNewOrderDetails(activeToken);
+      });
     }
 
     function addItemRow() {
@@ -2295,7 +2295,11 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
     function searchOrder() {
       const num = document.getElementById('searchOrderNumber').value.trim();
       if (!num) return alert("Enter an order number to search.");
-      google.script.run.withSuccessHandler(showOrderDetail).getOrderDetails(num, getActiveSessionToken());
+      lbJsonpRpc_('getOrderDetails',[num, getActiveSessionToken()],showOrderDetail,function(e){
+        const container = document.getElementById('searchResult');
+        container.textContent = 'Unable to search order: ' + (e && e.message ? e.message : e);
+        container.className = 'error';
+      });
     }
 
     function showOrderDetail(obj) {
