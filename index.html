@@ -618,7 +618,7 @@
 
   <!-- Token Section -->
   <div id="tokenSection" class="section">
-    <h2>टोकन <small style="font-size:11px">v3.8 WI पहचान</small></h2>
+    <h2>टोकन <small style="font-size:11px">V3.9</small></h2>
     <div id="guidedVoicePanel">
       <input id="guidedAutoStart" type="checkbox" checked hidden>
       <div id="guidedQuestion" role="status" aria-live="polite">वॉइस तैयार है।</div>
@@ -950,9 +950,15 @@ window.LB_API_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZl
       const p = document.getElementById('tokenPhone').value.trim();
       if(/^\d{10}$/.test(p)){
         const nameAtRequest=document.getElementById('tokenCustomerName').value;
-        google.script.run.withSuccessHandler(function(n){
-          if(n && hindiFormText_(n) && document.getElementById('tokenPhone').value.trim()===p && document.getElementById('tokenCustomerName').value===nameAtRequest) document.getElementById('tokenCustomerName').value=n;
-        }).getCustomerByPhone(p, getActiveSessionToken());
+        lbJsonpRpc_('getCustomerByPhone',[p, getActiveSessionToken()],function(n){
+          if(n && document.getElementById('tokenPhone').value.trim()===p &&
+             document.getElementById('tokenCustomerName').value===nameAtRequest){
+            document.getElementById('tokenCustomerName').value=n;
+          }
+        },function(e){
+          var st=document.getElementById('tokenBackendStatus');
+          if(st) st.textContent='Customer search failed: '+(e&&e.message?e.message:e);
+        });
       }
     }
 
