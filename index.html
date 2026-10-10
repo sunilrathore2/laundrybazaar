@@ -9,12 +9,12 @@
     // Keep this URL synchronized with the currently deployed Apps Script web app.
     (function () {
       'use strict';
-      var APP_URL = 'https://script.google.com/macros/s/AKfycbx4OpruMtoUX0S1Y3nXR3xixqLcMXY3tQwbV13NZbtXX0eUnpmZs-eQdnXxAwKn3_Vq/exec';
+      var APP_URL = 'https://script.google.com/macros/s/AKfycbyCpnx0zlYtLK4XYDZlMCxhh7IPp5hwjScP5OHVxkXlnM_JKDBQ2cdhRHMh5He28wZWAw/exec';
       function invoke(method, args, success, failure) {
         var controller = typeof AbortController === 'function' ? new AbortController() : null;
         var timer = setTimeout(function () {
           if (controller) controller.abort();
-        }, 45000);
+        }, (method==='saveOrder'||method==='saveInvoicePdfAndGetLink')?120000:45000);
 
         fetch(APP_URL, {
           method: 'POST',
@@ -741,6 +741,7 @@
     <span id="orderError" class="error"></span>
     <button class="btn" id="saveOrderBtn" onclick="saveOrder()">Save Order</button>
     <button class="btn" id="whatsappInvoiceBtn" style="display:none;" onclick="saveAndSendInvoiceWhatsapp()">Open WhatsApp</button>
+    <button class="btn" id="retryInvoicePdfBtn" style="display:none;" onclick="retrySavedInvoice_()">Prepare Invoice</button>
     <button class="btn" id="printInvoiceBtn" onclick="printInvoice()">Print Invoice</button>
     <button class="btn" id="printTagBtn" onclick="printTag()">Print Tag</button>
     <button class="btn" id="remoteInvoiceBtn" onclick="remotePrintInvoiceFromOrder()">Remote Invoice</button>
@@ -996,6 +997,7 @@
       if(e.key==='lbSession' && !e.newValue){sessionToken='';currentUser=null;showLoginScreen();}
     });
 
+    var savedInvoiceLinks_ = {};
     var startupCache_ = {};
     var startupLoading_ = false;
     function startupRunner_(method){
@@ -1010,6 +1012,7 @@
       var normalizedRole=String(res.role||'').trim().toLowerCase();
       sessionToken=res.token||sessionToken;
       currentUser={username:res.username, role:normalizedRole};
+      savedInvoiceLinks_={};
       localStorage.setItem('lbSession',sessionToken);
       document.getElementById('loginOverlay').style.display='none';
       var userBar=document.getElementById('userBar');
@@ -2475,6 +2478,7 @@
         document.getElementById('remoteInvoiceBtn').style.display = "none";
         document.getElementById('remoteTagBtn').style.display = "none";
         document.getElementById('whatsappInvoiceBtn').style.display = "none";
+        document.getElementById('retryInvoicePdfBtn').style.display = "none";
         if (typeof prefillCallback === 'function') prefillCallback();
       }).withFailureHandler(function(e){
         document.getElementById('orderError').textContent='Unable to get new order number: '+(e.message||e);
@@ -2627,17 +2631,19 @@
         return;
       }
       try{order.requestId=bookingRequestId_('order',order);}catch(e){document.getElementById('orderError').textContent=e.message;return;}
-      document.getElementById('orderError').textContent = "Saving order…";
+      document.getElementById('orderError').textContent = "Saving order and preparing invoice PDF…";
       document.getElementById('saveOrderBtn').disabled = true;
       google.script.run.withSuccessHandler((result) => {
         clearBookingRequest_('order');
         if(result && result.orderNumber)document.getElementById('orderNumber').value=result.orderNumber;
+        if(result && result.invoiceUrl)savedInvoiceLinks_[String(result.orderNumber)]=result.invoiceUrl;
+        document.getElementById('retryInvoicePdfBtn').style.display=(result && result.invoiceError)?'inline-block':'none';
         document.getElementById('printInvoiceBtn').style.display = "inline-block";
         document.getElementById('printTagBtn').style.display = "inline-block";
         document.getElementById('remoteInvoiceBtn').style.display = "inline-block";
         document.getElementById('remoteTagBtn').style.display = "inline-block";
         document.getElementById('whatsappInvoiceBtn').style.display = "inline-block";
-        document.getElementById('orderError').textContent = "Order Saved!";
+        document.getElementById('orderError').textContent = (result && result.invoiceError) ? "Order saved. Invoice PDF not ready: "+result.invoiceError : "Order Saved! Invoice ready.";
         document.getElementById('orderError').className = 'success';
         if (sourceTokenNumber) {
           sourceTokenNumber = '';
@@ -3091,6 +3097,21 @@
       reader.readAsDataURL(fileInput.files[0]);
     }
     
+    function retrySavedInvoice_(){
+      var orderNumber=document.getElementById('orderNumber').value,token=getActiveSessionToken();
+      if(!orderNumber||!token)return;
+      var button=document.getElementById('retryInvoicePdfBtn');if(button.disabled)return;
+      button.disabled=true;document.getElementById('orderError').textContent='Preparing saved order invoice…';
+      google.script.run.withSuccessHandler(function(url){
+        button.disabled=false;
+        if(!/^https:\/\//.test(String(url||''))){document.getElementById('orderError').textContent='Order is saved. '+String(url||'Invoice not ready.');return;}
+        savedInvoiceLinks_[String(orderNumber)]=url;
+        if(document.getElementById('orderNumber').value!==String(orderNumber))return;
+        button.style.display='none';document.getElementById('orderError').textContent='Invoice ready. Open WhatsApp to send it.';
+      }).withFailureHandler(function(e){button.disabled=false;document.getElementById('orderError').textContent='Order is saved. Invoice preparation failed: '+(e.message||e);})
+        .saveInvoicePdfAndGetLink(orderNumber,token);
+    }
+
     function saveAndSendInvoiceWhatsapp() {
       if (!sessionToken) {
         alert('Please login first.');
@@ -3118,15 +3139,14 @@
           alert('WhatsApp Web popup was blocked. Please allow popups for this site and press Open WhatsApp again.');
           return;
         }
-        whatsappWindow.document.write('<!doctype html><html><head><title>WhatsApp</title></head><body style="font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:20px;">Preparing invoice for WhatsApp Web...</body></html>');
+        whatsappWindow.document.write('<!doctype html><html><head><title>WhatsApp</title></head><body style="font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:20px;">Opening WhatsApp with saved invoice...</body></html>');
         whatsappWindow.document.close();
       }
 
-      google.script.run
-        .withSuccessHandler(function(fileUrl) {
+      function openSavedInvoice_(fileUrl) {
           if (!fileUrl || String(fileUrl).indexOf('Error ') === 0 || String(fileUrl).indexOf('Error generating PDF') === 0) {
             if(whatsappWindow) whatsappWindow.close();
-            alert('Unable to generate invoice PDF: ' + (fileUrl || 'Unknown error'));
+            alert('Saved invoice is unavailable: ' + (fileUrl || 'Unknown error'));
             return;
           }
 
@@ -3155,12 +3175,19 @@
               alert('Unable to open WhatsApp Web. Please allow popups and try again.');
             }
           }
-        })
+      }
+      var cachedLink=savedInvoiceLinks_[String(orderNumber)];
+      if(cachedLink){openSavedInvoice_(cachedLink);return;}
+      google.script.run.withSuccessHandler(function(fileUrl){
+        savedInvoiceLinks_[String(orderNumber)]=fileUrl;
+        openSavedInvoice_(fileUrl);
+      })
         .withFailureHandler(function(error) {
           if(whatsappWindow) whatsappWindow.close();
-          alert('Error generating invoice: ' + (error && error.message ? error.message : error));
+          document.getElementById('retryInvoicePdfBtn').style.display='inline-block';
+          alert('Unable to retrieve saved invoice: ' + (error && error.message ? error.message : error));
         })
-        .saveInvoicePdfAndGetLink(orderNumber, sessionToken);
+        .getOrderInvoiceLink(orderNumber, sessionToken);
     }
 
     // Admin functions
